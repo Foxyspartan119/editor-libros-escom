@@ -1,7 +1,7 @@
 import React from 'react';
-import type { Page, ContentBlock, SimulatorAsset, NodeType } from '../types';
+import type { Page, ContentBlock, SimulatorAsset } from '../types';
 import { BlockEditor } from './BlockEditor';
-import { PlusCircle, FileText, Gamepad2 } from 'lucide-react'; // Iconos
+import { FileText, Gamepad2 } from 'lucide-react'; // Iconos
 
 interface PageEditorProps {
   page: Page;

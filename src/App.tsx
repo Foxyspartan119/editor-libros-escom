@@ -216,19 +216,19 @@ function App() {
 
   // --- EXPORTAR HTML ---
   const handleExportHTML = () => {
-      // Aquí conectaremos la función generateBookHTML pronto
-      import('./engine/ExportEngine').then(mod => {
-        const htmlContent = mod.generateBookHTML(project);
-        const blob = new Blob([htmlContent], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${project.meta.title.replace(/\s+/g, '_')}_export.html`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      });
+      // Usamos la función importada directamente desde arriba
+      const htmlContent = generateBookHTML(project);
+      
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a'); 
+      a.href = url; 
+      a.download = `${project.meta.title.replace(/\s+/g, '_')}_offline.html`;
+      document.body.appendChild(a); 
+      a.click(); 
+      document.body.removeChild(a); 
+      URL.revokeObjectURL(url);
   };
 
   return (
