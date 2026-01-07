@@ -293,6 +293,17 @@ function App() {
       const currentPage = project.pages[readerPageIndex];
       const totalPages = project.pages.length;
 
+      useEffect(() => {
+        // @ts-ignore  <-- Para que TypeScript no se queje de window.MathJax
+        if (window.MathJax && currentPage) {
+            // Esperamos un momento a que React pinte el HTML
+            setTimeout(() => {
+                // @ts-ignore
+                window.MathJax.typesetPromise().catch((err) => console.log(err));
+            }, 100);
+        }
+      }, [readerPageIndex, currentPage]);
+
       const handleNext = () => {
         if (readerPageIndex < totalPages - 1) {
             setReaderPageIndex(prev => prev + 1);
@@ -308,89 +319,102 @@ function App() {
       };
 
       return (
-        <div className="reader-container" style={{maxWidth:'900px', margin:'0 auto', padding:'20px', fontFamily:'system-ui, sans-serif', minHeight:'100vh', display:'flex', flexDirection:'column'}}>
-            
-            {/* Header Simple */}
-            <header style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px', paddingBottom:'20px', borderBottom:'1px solid var(--border-color)'}}>
-                <h1 style={{margin:0, fontSize:'1.5rem', color:'var(--brand-primary)'}}>
-                    {project.meta.title}
-                </h1>
-                <button onClick={() => setIsDarkMode(!isDarkMode)} style={{background:'none', border:'1px solid gray', padding:'5px', borderRadius:'4px', cursor:'pointer'}}>
-                    {isDarkMode ? <Sun size={18}/> : <Moon size={18}/>}
-                </button>
-            </header>
-            
-            {/* Área de Contenido (Flexible para empujar el footer abajo) */}
-            <div className="content-area" style={{flex:1}}>
-                {!currentPage ? (
-                    <div style={{textAlign:'center', padding:'50px', color:'gray'}}>
-                        <p>Cargando libro...</p>
-                    </div>
-                ) : (
-                    <div key={currentPage.id} style={{animation:'fadeIn 0.3s'}}>
-                        {/* Títulos dinámicos */}
-                        {currentPage.type === 'capitulo' && <h2 style={{color:'var(--brand-primary)', borderBottom:'2px solid #eee', paddingBottom:'10px'}}>{currentPage.title}</h2>}
-                        {currentPage.type === 'seccion' && <h3 style={{marginTop:'10px'}}>{currentPage.title}</h3>}
-                        {currentPage.type === 'portada' && <h1 style={{textAlign:'center', fontSize:'3em', margin:'40px 0', color:'var(--brand-primary)'}}>{currentPage.title}</h1>}
+      // Usamos el mismo color de fondo grisáceo que el export (#f1f5f9)
+      <div className="reader-wrapper" style={{ minHeight: '100vh', background: '#f1f5f9', padding: '40px 20px', fontFamily: 'system-ui, sans-serif' }}>
+          
+          {/* Header Flotante estilo App */}
+          <header style={{ maxWidth: '800px', margin: '0 auto 20px auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+               {/* Botón para volver al modo editor si eres admin (opcional, por si lo necesitas) */}
+              <div style={{fontSize: '0.9rem', color: '#64748b'}}>Vista Previa: Alumno</div>
+              
+              <button onClick={() => setIsDarkMode(!isDarkMode)} style={{ background: 'white', border: '1px solid #e2e8f0', padding: '8px', borderRadius: '6px', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                  {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+          </header>
 
-                        {/* Bloques de contenido */}
-                        <div style={{lineHeight:'1.8', fontSize:'1.1rem'}}>
-                            {currentPage.blocks.map(block => (
-                                <div key={block.id} style={{margin:'20px 0'}}>
-                                    {block.type === 'text' && <div dangerouslySetInnerHTML={{__html: block.content.replace(/\n/g, '<br/>')}} />}
-                                    
-                                    {block.type === 'simulator' && (
-                                        <div style={{border:'1px solid var(--border-color)', padding:'20px', borderRadius:'8px', background: 'var(--bg-secondary)'}}>
-                                            <SimulatorRenderer 
-                                                code={getSimulatorCode(block.simulatorId)} 
-                                                params={block.simConfig || {}} 
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
+          {/* ESTE ES EL CONTENEDOR TIPO "HOJA DE PAPEL" IGUAL AL EXPORTADO */}
+          <div className="book-container" style={{ 
+              maxWidth: '800px', 
+              margin: '0 auto', 
+              background: 'white', 
+              padding: '40px', 
+              borderRadius: '8px', 
+              boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+              color: '#1a202c'
+          }}>
+              
+              {/* Título del Libro (Solo en la primera página o siempre, como prefieras) */}
+              <h1 style={{ textAlign: 'center', color: '#2563eb', borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', marginTop: 0 }}>
+                  {project.meta.title}
+              </h1>
 
-            {/* --- BARRA DE NAVEGACIÓN (BOTONES) --- */}
-            {totalPages > 0 && (
-                <div style={{marginTop:'40px', paddingTop:'20px', borderTop:'1px solid var(--border-color)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                    <button 
-                        onClick={handlePrev} 
-                        disabled={readerPageIndex === 0}
-                        style={{
-                            padding: '10px 20px', 
-                            cursor: readerPageIndex === 0 ? 'not-allowed' : 'pointer',
-                            opacity: readerPageIndex === 0 ? 0.5 : 1,
-                            background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px'
-                        }}
-                    >
-                        ← Anterior
-                    </button>
+              <div className="content-area" style={{ minHeight: '400px' }}>
+                  {!currentPage ? (
+                      <div style={{ textAlign: 'center', padding: '50px', color: 'gray' }}>Cargando...</div>
+                  ) : (
+                      <div key={currentPage.id} className="page-content animate-fade">
+                          {/* Renderizado de Títulos igual al Export */}
+                          {currentPage.type === 'capitulo' && <h2 style={{ color: '#2563eb', borderBottom: '2px solid #f1f5f9', paddingBottom: '10px' }}>{currentPage.title}</h2>}
+                          {currentPage.type === 'seccion' && <h3 style={{ marginTop: '20px', fontSize: '1.5em' }}>{currentPage.title}</h3>}
+                          {currentPage.type === 'portada' && <h1 style={{ textAlign: 'center', fontSize: '3em', margin: '60px 0', color: '#2563eb' }}>{currentPage.title}</h1>}
 
-                    <span style={{color:'gray', fontSize:'0.9rem'}}>
-                        Página {readerPageIndex + 1} de {totalPages}
-                    </span>
+                          {/* Bloques */}
+                          <div style={{ lineHeight: '1.6', fontSize: '1.1rem' }}>
+                              {currentPage.blocks.map(block => (
+                                  <div key={block.id} style={{ margin: '20px 0' }}>
+                                      {block.type === 'text' && (
+                                          <div dangerouslySetInnerHTML={{ __html: block.content.replace(/\n/g, '<br/>') }} />
+                                      )}
+                                      
+                                      {block.type === 'simulator' && (
+                                          <div className="simulador-wrapper" style={{ margin: '20px 0', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px', background: '#f8fafc' }}>
+                                              <SimulatorRenderer 
+                                                  code={getSimulatorCode(block.simulatorId)} 
+                                                  params={block.simConfig || {}} 
+                                              />
+                                          </div>
+                                      )}
+                                  </div>
+                              ))}
+                          </div>
+                      </div>
+                  )}
+              </div>
 
-                    <button 
-                        onClick={handleNext} 
-                        disabled={readerPageIndex === totalPages - 1}
-                        style={{
-                            padding: '10px 20px', 
-                            cursor: readerPageIndex === totalPages - 1 ? 'not-allowed' : 'pointer',
-                            opacity: readerPageIndex === totalPages - 1 ? 0.5 : 1,
-                            background: 'var(--brand-primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold'
-                        }}
-                    >
-                        Siguiente →
-                    </button>
-                </div>
-            )}
-        </div>
-      );
-  }
+              {/* NAV BUTTONS (Estilo idéntico al Export) */}
+              {totalPages > 0 && (
+                  <div className="nav-buttons" style={{ display: 'flex', justifyContent: 'space-between', marginTop: '40px', borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
+                      <button 
+                          onClick={handlePrev} 
+                          disabled={readerPageIndex === 0}
+                          style={{
+                              background: readerPageIndex === 0 ? '#cbd5e1' : '#2563eb',
+                              color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: readerPageIndex === 0 ? 'not-allowed' : 'pointer', fontWeight: 'bold'
+                          }}
+                      >
+                          Anterior
+                      </button>
+
+                      <span style={{ alignSelf: 'center', color: '#64748b' }}>
+                          Página {readerPageIndex + 1} de {totalPages}
+                      </span>
+
+                      <button 
+                          onClick={handleNext} 
+                          disabled={readerPageIndex === totalPages - 1}
+                          style={{
+                              background: readerPageIndex === totalPages - 1 ? '#cbd5e1' : '#2563eb',
+                              color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: readerPageIndex === totalPages - 1 ? 'not-allowed' : 'pointer', fontWeight: 'bold'
+                          }}
+                      >
+                          Siguiente
+                      </button>
+                  </div>
+              )}
+          </div>
+      </div>
+    );
+}
 
   // ==========================================
   // VISTA 2: MODO PROFESOR (EDITOR)
