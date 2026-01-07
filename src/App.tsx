@@ -13,7 +13,7 @@ import { db } from './firebase';
 import { doc, onSnapshot, setDoc, collection, query } from 'firebase/firestore';
 
 const INITIAL_PROJECT: BookProject = {
-  meta: { title: "Cargando...", author: "Anon", created: Date.now(), theme: 'light' },
+  meta: { title: "Libro Interactivo", author: "Anon", created: Date.now(), theme: 'light' },
   assets: { simulators: [] },
   pages: []
 };
@@ -35,6 +35,9 @@ function App() {
   // Memoria para la nube
   const [cloudSimulators, setCloudSimulators] = useState<SimulatorAsset[]>([]);
 
+  // Indice de la página que está leyendo el alumno
+  const [readerPageIndex, setReaderPageIndex] = useState(0);
+
   // --- 1. EFECTO DE INICIO (DETECTAR MODO Y CONECTAR A NUBE) ---
   useEffect(() => {
     // A) Detectar Admin
@@ -49,9 +52,7 @@ function App() {
             console.log("☁️ Sincronizado desde la nube");
             setProject(data);
             
-            if (!activePageId && data.pages.length > 0) {
-                 // No forzamos cambio de página para no molestar al usuario
-            }
+            setReaderPageIndex(0); // Reiniciar al inicio
         } else {
              if(isAdmin) console.log("Listo para crear el primer libro en la nube.");
         }
@@ -285,51 +286,108 @@ function App() {
     }
   };
 
-  // ==========================================
-  // VISTA 1: MODO ALUMNO (LECTOR)
+// ==========================================
+  // VISTA 1: MODO ALUMNO (LECTOR CON PAGINACIÓN)
   // ==========================================
   if (isReadOnly) {
+      const currentPage = project.pages[readerPageIndex];
+      const totalPages = project.pages.length;
+
+      const handleNext = () => {
+        if (readerPageIndex < totalPages - 1) {
+            setReaderPageIndex(prev => prev + 1);
+            window.scrollTo(0, 0); // Subir al inicio al cambiar
+        }
+      };
+
+      const handlePrev = () => {
+        if (readerPageIndex > 0) {
+            setReaderPageIndex(prev => prev - 1);
+            window.scrollTo(0, 0);
+        }
+      };
+
       return (
-        <div className="reader-container" style={{maxWidth:'900px', margin:'0 auto', padding:'20px', fontFamily:'system-ui, sans-serif'}}>
-            <header style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'40px', paddingBottom:'20px', borderBottom:'1px solid var(--border-color)'}}>
-                <div>
-                    <h1 style={{margin:0, color:'var(--brand-primary)'}}>{project.meta.title}</h1>
-                </div>
+        <div className="reader-container" style={{maxWidth:'900px', margin:'0 auto', padding:'20px', fontFamily:'system-ui, sans-serif', minHeight:'100vh', display:'flex', flexDirection:'column'}}>
+            
+            {/* Header Simple */}
+            <header style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px', paddingBottom:'20px', borderBottom:'1px solid var(--border-color)'}}>
+                <h1 style={{margin:0, fontSize:'1.5rem', color:'var(--brand-primary)'}}>
+                    {project.meta.title}
+                </h1>
                 <button onClick={() => setIsDarkMode(!isDarkMode)} style={{background:'none', border:'1px solid gray', padding:'5px', borderRadius:'4px', cursor:'pointer'}}>
                     {isDarkMode ? <Sun size={18}/> : <Moon size={18}/>}
                 </button>
             </header>
             
-            <div className="content-area">
-                {project.pages.length === 0 && (
+            {/* Área de Contenido (Flexible para empujar el footer abajo) */}
+            <div className="content-area" style={{flex:1}}>
+                {!currentPage ? (
                     <div style={{textAlign:'center', padding:'50px', color:'gray'}}>
-                        <p>Cargando contenido o esperando publicación...</p>
+                        <p>Cargando libro...</p>
                     </div>
-                )}
-                
-                {project.pages.map(page => (
-                    <div key={page.id} style={{marginBottom:'60px', animation:'fadeIn 0.5s'}}>
-                        {page.type === 'capitulo' && <h2 style={{color:'var(--brand-primary)', borderBottom:'2px solid #eee', paddingBottom:'10px'}}>{page.title}</h2>}
-                        {page.type === 'seccion' && <h3 style={{marginTop:'30px'}}>{page.title}</h3>}
-                        {page.type === 'subseccion' && <h4 style={{fontStyle:'italic', color:'#555'}}>{page.title}</h4>}
-                        {page.type === 'portada' && <h1 style={{textAlign:'center', fontSize:'3em', margin:'50px 0'}}>{page.title}</h1>}
+                ) : (
+                    <div key={currentPage.id} style={{animation:'fadeIn 0.3s'}}>
+                        {/* Títulos dinámicos */}
+                        {currentPage.type === 'capitulo' && <h2 style={{color:'var(--brand-primary)', borderBottom:'2px solid #eee', paddingBottom:'10px'}}>{currentPage.title}</h2>}
+                        {currentPage.type === 'seccion' && <h3 style={{marginTop:'10px'}}>{currentPage.title}</h3>}
+                        {currentPage.type === 'portada' && <h1 style={{textAlign:'center', fontSize:'3em', margin:'40px 0', color:'var(--brand-primary)'}}>{currentPage.title}</h1>}
 
-                        <div style={{lineHeight:'1.6'}}>
-                        {page.blocks.map(block => (
-                            <div key={block.id} style={{margin:'15px 0'}}>
-                                {block.type === 'text' && <div dangerouslySetInnerHTML={{__html: block.content.replace(/\n/g, '<br/>')}} />}
-                                {block.type === 'simulator' && (
-                                    <div style={{border:'1px solid #ddd', padding:'20px', borderRadius:'8px', background: isDarkMode ? '#1a1a1a' : '#f9fafb'}}>
-                                        <SimulatorRenderer code={getSimulatorCode(block.simulatorId)} params={block.simConfig || {}} />
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                        {/* Bloques de contenido */}
+                        <div style={{lineHeight:'1.8', fontSize:'1.1rem'}}>
+                            {currentPage.blocks.map(block => (
+                                <div key={block.id} style={{margin:'20px 0'}}>
+                                    {block.type === 'text' && <div dangerouslySetInnerHTML={{__html: block.content.replace(/\n/g, '<br/>')}} />}
+                                    
+                                    {block.type === 'simulator' && (
+                                        <div style={{border:'1px solid var(--border-color)', padding:'20px', borderRadius:'8px', background: 'var(--bg-secondary)'}}>
+                                            <SimulatorRenderer 
+                                                code={getSimulatorCode(block.simulatorId)} 
+                                                params={block.simConfig || {}} 
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     </div>
-                ))}
+                )}
             </div>
-            <footer style={{marginTop:'50px', textAlign:'center', fontSize:'0.8em', color:'gray', padding:'20px'}}>Libro Interactivo - ESCOM</footer>
+
+            {/* --- BARRA DE NAVEGACIÓN (BOTONES) --- */}
+            {totalPages > 0 && (
+                <div style={{marginTop:'40px', paddingTop:'20px', borderTop:'1px solid var(--border-color)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                    <button 
+                        onClick={handlePrev} 
+                        disabled={readerPageIndex === 0}
+                        style={{
+                            padding: '10px 20px', 
+                            cursor: readerPageIndex === 0 ? 'not-allowed' : 'pointer',
+                            opacity: readerPageIndex === 0 ? 0.5 : 1,
+                            background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px'
+                        }}
+                    >
+                        ← Anterior
+                    </button>
+
+                    <span style={{color:'gray', fontSize:'0.9rem'}}>
+                        Página {readerPageIndex + 1} de {totalPages}
+                    </span>
+
+                    <button 
+                        onClick={handleNext} 
+                        disabled={readerPageIndex === totalPages - 1}
+                        style={{
+                            padding: '10px 20px', 
+                            cursor: readerPageIndex === totalPages - 1 ? 'not-allowed' : 'pointer',
+                            opacity: readerPageIndex === totalPages - 1 ? 0.5 : 1,
+                            background: 'var(--brand-primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold'
+                        }}
+                    >
+                        Siguiente →
+                    </button>
+                </div>
+            )}
         </div>
       );
   }
