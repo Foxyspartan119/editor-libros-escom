@@ -1041,3 +1041,61 @@ label.icon-button {
     border-radius: 8px;
     border: 1px solid var(--border-color);
 }
+
+/* --- ESTILOS DE LA BARRA LATERAL (FASE 3) --- */
+
+/* Cada item de la lista ahora es un contenedor flexible */
+.toc li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Texto a la izq, botones a la der */
+  padding-right: 5px;
+  position: relative; /* Para posicionar cosas si hace falta */
+}
+
+/* El texto de la página */
+.page-title-span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+/* Contenedor de botoncitos (oculto por defecto) */
+.page-actions {
+  display: none; /* Secreto 🤫 */
+  gap: 2px;
+  background: var(--bg-primary); /* Fondo para tapar el texto si es largo */
+  border-radius: 4px;
+  padding: 2px;
+  box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+}
+
+/* ¡Aparece al pasar el mouse! */
+.toc li:hover .page-actions {
+  display: flex;
+}
+
+/* Estilo de los micro-botones */
+.mini-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mini-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--brand-primary);
+}
+
+.mini-btn.danger:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}

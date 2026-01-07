@@ -5,7 +5,7 @@ import { PageEditor } from './components/PageEditor';
 import { SimulatorUploader } from './components/SimulatorUploader';
 import { SimulatorRenderer } from './components/SimulatorRenderer'; 
 // Iconos: Agregamos HelpCircle y quitamos Trash2 (que no se usa aquí)
-import { Moon, Sun, Save, FolderOpen, Download, Undo, HelpCircle, CloudUpload } from 'lucide-react'; 
+import { Moon, Sun, Save, FolderOpen, Download, Undo, HelpCircle, CloudUpload, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'; 
 import { generateBookHTML } from './engine/ExportEngine';
 
 // --- FIREBASE IMPORTS ---
@@ -182,6 +182,37 @@ function App() {
     setProject(previousState);
   };
 
+  // --- GESTIÓN DE ORDEN DE PÁGINAS (FASE 3) ---
+  const handleMovePage = (pageId: string, direction: -1 | 1, e: React.MouseEvent) => {
+    e.stopPropagation(); // Evita que se seleccione la página al hacer click en la flecha
+    const index = project.pages.findIndex(p => p.id === pageId);
+    if (index < 0) return;
+    const targetIndex = index + direction;
+    
+    // Validar límites
+    if (targetIndex < 0 || targetIndex >= project.pages.length) return;
+
+    // Clonar y mover
+    const newPages = [...project.pages];
+    [newPages[index], newPages[targetIndex]] = [newPages[targetIndex], newPages[index]]; // Intercambio mágico
+    
+    setProject(prev => ({ ...prev, pages: newPages }));
+  };
+
+  const handleDeletePage = (pageId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Confirmación de seguridad
+    if (!confirm("⚠️ ¿Estás seguro de eliminar esta página?\nSe perderá todo el texto y simuladores que tenga dentro.")) return;
+    
+    setProject(prev => ({
+        ...prev,
+        pages: prev.pages.filter(p => p.id !== pageId)
+    }));
+    
+    // Si borramos la página que estábamos viendo, deseleccionar
+    if (activePageId === pageId) setActivePageId(null);
+  };
+
   const handleAddPage = (type: NodeType = 'seccion') => {
     setHistory(prev => [...prev, project]);
     const newPage: Page = {
@@ -342,10 +373,49 @@ function App() {
             <button onClick={() => handleAddPage('seccion')}>+ Sec</button>
             <button onClick={() => setIsUploadModalOpen(true)} style={{flexBasis:'100%'}}>+ Simulador</button>
           </div>
-          <ul style={{ marginTop: '1rem' }}>
-            {project.pages.map(page => (
-              <li key={page.id} className={page.id === activePageId ? 'selected' : ''} style={getIndentStyle(page.type)} onClick={() => setActivePageId(page.id)}>
-                {page.title || "Sin título"}
+          <ul style={{ marginTop: '1rem', listStyle: 'none', padding: 0 }}>
+            {project.pages.map((page, index) => (
+              <li 
+                key={page.id} 
+                className={page.id === activePageId ? 'selected' : ''} 
+                style={getIndentStyle(page.type)}
+                onClick={() => setActivePageId(page.id)}
+              >
+                {/* Título de la página */}
+                <span className="page-title-span" title={page.title}>
+                    {page.title || "Sin título"}
+                </span>
+
+                {/* --- SUPERPODERES: BOTONES FLOTANTES --- */}
+                {!isReadOnly && (
+                    <div className="page-actions">
+                        <button 
+                            className="mini-btn" 
+                            onClick={(e) => handleMovePage(page.id, -1, e)} 
+                            disabled={index === 0}
+                            title="Subir"
+                        >
+                            <ArrowUp size={14}/>
+                        </button>
+                        
+                        <button 
+                            className="mini-btn" 
+                            onClick={(e) => handleMovePage(page.id, 1, e)} 
+                            disabled={index === project.pages.length - 1}
+                            title="Bajar"
+                        >
+                            <ArrowDown size={14}/>
+                        </button>
+                        
+                        <button 
+                            className="mini-btn danger" 
+                            onClick={(e) => handleDeletePage(page.id, e)} 
+                            title="Eliminar Página"
+                        >
+                            <Trash2 size={14}/>
+                        </button>
+                    </div>
+                )}
               </li>
             ))}
           </ul>
