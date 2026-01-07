@@ -10,7 +10,7 @@ import { generateBookHTML } from './engine/ExportEngine';
 
 // --- FIREBASE IMPORTS ---
 import { db } from './firebase'; 
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, collection, query, orderBy } from 'firebase/firestore';
 
 const INITIAL_PROJECT: BookProject = {
   meta: { title: "Cargando...", author: "Anon", created: Date.now(), theme: 'light' },
@@ -52,6 +52,32 @@ function App() {
         } else {
              if(isAdmin) console.log("Listo para crear el primer libro en la nube.");
         }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // --- ANTENA 2: ESCUCHAR LA BIBLIOTECA GLOBAL DE SIMULADORES ---
+  useEffect(() => {
+    // Esto conecta tu lista con la colección "simuladores" de Firebase
+    const q = query(collection(db, "simuladores"), orderBy("timestamp", "desc"));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const simuladoresCloud = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as SimulatorAsset[];
+
+      console.log("🎮 Simuladores actualizados desde la nube:", simuladoresCloud.length);
+
+      // Actualizamos SOLO la lista de simuladores disponibles en el proyecto
+      setProject(prev => ({
+        ...prev,
+        assets: {
+          ...prev.assets,
+          simulators: simuladoresCloud // ¡Reemplazamos con la lista fresca de la nube!
+        }
+      }));
     });
 
     return () => unsubscribe();
