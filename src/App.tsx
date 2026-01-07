@@ -292,41 +292,46 @@ function App() {
             <h1>{project.meta.title}</h1>
             <span style={{fontSize:'0.7em', background:'var(--brand-error)', color:'white', padding:'2px 6px', borderRadius:'4px'}}>EDITOR</span>
         </div>
-        <div className="sep"></div>
+        <div className="header-sep"></div>
 
         {/* --- AQUI VOLVIÓ TU BOTÓN DE AYUDA --- */}
         <a 
             href="/ayuda.html" 
             target="_blank" 
-            className="button-lookalike" 
+            className="button-link" 
             title="Ver Ayuda"
-            style={{textDecoration:'none', color:'inherit', display:'flex', alignItems:'center', fontSize:'0.9rem', marginRight:'10px'}}
         >
             <HelpCircle size={18} style={{marginRight:5}}/> Ayuda
         </a>
 
-        <button onClick={() => setIsDarkMode(!isDarkMode)}>{isDarkMode ? <Sun size={18}/> : <Moon size={18}/>}</button>
-        <button onClick={handleUndo} disabled={history.length === 0} title="Deshacer"><Undo size={18}/></button>
+        <button className="icon-button" onClick={() => setIsDarkMode(!isDarkMode)}>
+        {isDarkMode ? <Sun size={18}/> : <Moon size={18}/>}
+    </button>
+    <button className="icon-button" onClick={handleUndo} disabled={history.length === 0} title="Deshacer">
+        <Undo size={18}/>
+    </button>
+
+    <div className="header-sep"></div>
 
         {/* GRUPO DE ACCIONES LOCALES */}
-        <div style={{display:'flex', gap:'5px', borderLeft:'1px solid #555', paddingLeft:'10px', marginLeft:'10px'}}>
-             <label className="button-lookalike" title="Importar JSON viejo">
+        <div className="local-actions-group">
+             <label className="icon-button" title="Importar JSON viejo">
                 <FolderOpen size={18}/>
                 <input type="file" accept=".json" onChange={loadProjectJSON} style={{display:'none'}}/>
             </label>
-            <button onClick={saveProjectJSON} title="Guardar Respaldo Local (JSON)"><Save size={18}/></button>
+            <button className="icon-button" onClick={saveProjectJSON} title="Guardar Respaldo Local (JSON)"><Save size={18}/></button>
         </div>
 
         {/* GRUPO DE NUBE */}
         <button 
             onClick={saveToCloud} 
             disabled={isSyncing}
-            style={{background:'var(--brand-success)', color:'white', borderColor:'var(--brand-success)', fontWeight:'bold', marginLeft:'auto'}}
+            style={{background:'var(--brand-success)', color:'white', border: 'none', padding:'8px 15px', borderRadius: '6px', fontWeight: 'bold', marginLeft:'auto', display:'flex', alignItems:'center', cursor: 'pointer'}}
         >
             {isSyncing ? 'Subiendo...' : <><CloudUpload size={18} style={{marginRight:5}}/> PUBLICAR</>}
         </button>
         
-        <button onClick={handleExportHTML} title="Descargar HTML Offline"><Download size={18}/></button>
+        <button className="icon-button" onClick={handleExportHTML} title="Descargar HTML Offline" style={{marginLeft:'10px'}}><Download size={18}/></button>
       </header>
   
       <div className="layout">

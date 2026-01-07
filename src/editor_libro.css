@@ -994,3 +994,50 @@ figure img:hover {
   flex: 1; 
   overflow: hidden; /* Para que el scroll sea interno en los paneles */
 }
+
+.icon-button, .button-link {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.icon-button:hover, .button-link:hover {
+    background-color: var(--bg-secondary);
+    border-color: var(--brand-primary);
+    transform: translateY(-1px);
+}
+
+.icon-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+label.icon-button {
+    margin-bottom: 0;
+}
+
+.header-sep {
+    height: 24px;
+    width: 1px;
+    background-color: var(--border-color);
+    margin: 0 10px;
+}
+
+.local-actions-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background-color: var(--bg-secondary);
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
