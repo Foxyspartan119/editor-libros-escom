@@ -11,7 +11,7 @@ interface SimulatorUploaderProps {
   onSave: (name: string, code: string) => void;
 }
 
-export const SimulatorUploader: React.FC<SimulatorUploaderProps> = ({ isOpen, onClose, onSave }) => {
+export const SimulatorUploader: React.FC<SimulatorUploaderProps> = ({ isOpen, onClose }) => {
   const [name, setName] = useState('');
   const [code, setCode] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'validating' | 'valid' | 'error'>('idle');
