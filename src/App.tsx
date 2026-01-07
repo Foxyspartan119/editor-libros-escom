@@ -10,7 +10,7 @@ import { generateBookHTML } from './engine/ExportEngine';
 
 // --- FIREBASE IMPORTS ---
 import { db } from './firebase'; 
-import { doc, onSnapshot, setDoc, collection, query, orderBy } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, collection, query } from 'firebase/firestore';
 
 const INITIAL_PROJECT: BookProject = {
   meta: { title: "Cargando...", author: "Anon", created: Date.now(), theme: 'light' },
@@ -31,6 +31,9 @@ function App() {
   // ESTADOS DE MODO
   const [isReadOnly, setIsReadOnly] = useState(true); 
   const [isSyncing, setIsSyncing] = useState(false); 
+
+  // Memoria para la nube
+  const [cloudSimulators, setCloudSimulators] = useState<SimulatorAsset[]>([]);
 
   // --- 1. EFECTO DE INICIO (DETECTAR MODO Y CONECTAR A NUBE) ---
   useEffect(() => {
@@ -57,27 +60,19 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // --- ANTENA 2: ESCUCHAR LA BIBLIOTECA GLOBAL DE SIMULADORES ---
+// --- ANTENA 2: ESCUCHAR SIMULADORES (VERSIÓN ROBUSTA) ---
   useEffect(() => {
-    // Esto conecta tu lista con la colección "simuladores" de Firebase
-    const q = query(collection(db, "simuladores"), orderBy("timestamp", "desc"));
+    // 1. Quitamos 'orderBy' temporalmente para evitar errores de índice silenciosos
+    const q = query(collection(db, "simuladores")); 
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const simuladoresCloud = snapshot.docs.map(doc => ({
+      const sims = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as SimulatorAsset[];
 
-      console.log("🎮 Simuladores actualizados desde la nube:", simuladoresCloud.length);
-
-      // Actualizamos SOLO la lista de simuladores disponibles en el proyecto
-      setProject(prev => ({
-        ...prev,
-        assets: {
-          ...prev.assets,
-          simulators: simuladoresCloud // ¡Reemplazamos con la lista fresca de la nube!
-        }
-      }));
+      console.log("🎮 Lista de Nube cargada:", sims.length, sims);
+      setCloudSimulators(sims); // <--- GUARDAMOS EN LA VARIABLE SEGURA
     });
 
     return () => unsubscribe();
@@ -452,7 +447,14 @@ function App() {
             (() => {
               const activePage = project.pages.find(p => p.id === activePageId);
               if (!activePage) return <p>Error cargando página</p>;
-              return <PageEditor page={activePage} availableSimulators={project.assets.simulators} onUpdatePage={handleUpdatePage} />;
+              // Fusion de listas de simuladores (locales + nube)
+              const allSims = [...cloudSimulators];
+              return (
+              <PageEditor 
+                page={activePage}
+                availableSimulators={allSims}
+                onUpdatePage={handleUpdatePage}
+              />);
             })()
           ) : <div className="empty-state">
               <p>Selecciona una página o carga un proyecto.</p>
