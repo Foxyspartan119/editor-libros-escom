@@ -327,7 +327,7 @@ function App() {
 
         {/* --- AQUI VOLVIÓ TU BOTÓN DE AYUDA --- */}
         <a 
-            href="/ayuda.html" 
+            href="ayuda.html" 
             target="_blank" 
             className="button-link" 
             title="Ver Ayuda"
