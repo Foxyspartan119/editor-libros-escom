@@ -3,7 +3,7 @@ import type { BookProject, Page, SimulatorAsset, NodeType, ContentBlock } from '
 import './editor_libro.css';
 import { PageEditor } from './components/PageEditor';
 import { SimulatorUploader } from './components/SimulatorUploader';
-import { SimulatorRenderer } from './components/SimulatorRenderer'; 
+// import { SimulatorRenderer } from './components/SimulatorRenderer'; 
 // Iconos: Agregamos HelpCircle y quitamos Trash2 (que no se usa aquí)
 import { Moon, Sun, Save, FolderOpen, Download, Undo, HelpCircle, CloudUpload, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'; 
 import { generateBookHTML } from './engine/ExportEngine';
@@ -42,7 +42,7 @@ function App() {
   const [cloudSimulators, setCloudSimulators] = useState<SimulatorAsset[]>([]);
 
   // Indice de la página que está leyendo el alumno
-  const [readerPageIndex, setReaderPageIndex] = useState(0);
+  //const [readerPageIndex, setReaderPageIndex] = useState(0);
 
   // --- 1. EFECTO DE INICIO (DETECTAR MODO Y CONECTAR A NUBE) ---
   useEffect(() => {
@@ -58,7 +58,7 @@ function App() {
             console.log("☁️ Sincronizado desde la nube");
             setProject(data);
             
-            setReaderPageIndex(0); // Reiniciar al inicio
+          //  setReaderPageIndex(0); Reiniciar al inicio
         } else {
              if(isAdmin) console.log("Listo para crear el primer libro en la nube.");
         }
@@ -268,12 +268,12 @@ function App() {
     }));
   };
 
-  const getSimulatorCode = (simId?: string) => {
+  /*const getSimulatorCode = (simId?: string) => {
       if(!simId) return "";
       const cleanId = simId.replace('legacy_', '');
       const sim = project.assets.simulators.find(s => s.id === simId || s.id.includes(cleanId));
       return sim ? sim.code : "";
-  };
+  };*/
 
   const handleExportHTML = () => {
       const htmlContent = generateBookHTML(project);
@@ -293,187 +293,33 @@ function App() {
   };
 
 // ==========================================
-  // VISTA 1: MODO ALUMNO (LECTOR CON PAGINACIÓN)
+  // VISTA 1: MODO ALUMNO (SOLUCIÓN IFRAME "ESPEJO")
   // ==========================================
-if (isReadOnly) {
-    const currentPage = project.pages[readerPageIndex];
-    const totalPages = project.pages.length;
+  if (isReadOnly) {
+      // 1. Generamos el HTML "en vivo" usando tu motor de exportación corregido
+      const rawHTML = generateBookHTML(project);
 
-    // 1. EFECTO MAESTRO DE MATHJAX
-    useEffect(() => {
-        // A) Definir la configuración ANTES de cargar el script
-        window.MathJax = {
-            tex: {
-                inlineMath: [['$', '$'], ['\\(', '\\)']],
-                displayMath: [['$$', '$$'], ['\\[', '\\]']],
-                packages: ['base', 'ams']
-            },
-            startup: {
-                typeset: false // Lo haremos manualmente para evitar conflictos con React
-            }
-        };
-
-        // B) Cargar el script si no existe
-        if (!document.getElementById('mathjax-script')) {
-            const script = document.createElement('script');
-            script.id = 'mathjax-script';
-            script.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js";
-            script.async = true;
-            document.head.appendChild(script);
-        }
-    }, []);
-
-    // 2. EFECTO DE RENDERIZADO (Se activa al cambiar de página)
-    useEffect(() => {
-        if (currentPage && window.MathJax && window.MathJax.typesetPromise) {
-            // Damos un respiro de 50ms para asegurar que el DOM de React ya pintó el texto
-            setTimeout(() => {
-                const contentDiv = document.getElementById('book-content-area');
-                if (contentDiv) {
-                    // Limpiamos renderizados previos para evitar duplicados
-                    window.MathJax.typesetClear([contentDiv]);
-                    // Renderizamos
-                    window.MathJax.typesetPromise([contentDiv]).catch((err: any) => console.error(err));
-                }
-            }, 50);
-        }
-    }, [readerPageIndex, currentPage]); // Se repite cada vez que cambias de página
-
-    const handleNext = () => {
-        if (readerPageIndex < totalPages - 1) {
-            setReaderPageIndex(prev => prev + 1);
-            window.scrollTo(0, 0);
-        }
-    };
-
-    const handlePrev = () => {
-        if (readerPageIndex > 0) {
-            setReaderPageIndex(prev => prev - 1);
-            window.scrollTo(0, 0);
-        }
-    };
-
-    return (
-        // CONTENEDOR PRINCIPAL "RESET"
-        // Fondo gris, bloqueamos estilos globales de alineación
-        <div style={{ 
-            minHeight: '100vh', 
-            width: '100%',
-            backgroundColor: '#f1f5f9', 
-            padding: '40px 20px', 
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-            boxSizing: 'border-box',
-            position: 'absolute', // Truco para tapar la UI del editor si algo queda abajo
-            top: 0,
-            left: 0,
-            zIndex: 9999,
-            overflowY: 'auto'
-        }}>
-            
-            {/* HEADER FLOTANTE SIMPLE */}
-            <div style={{ maxWidth: '800px', margin: '0 auto 20px auto', display: 'flex', justifyContent: 'flex-end' }}>
-                 <button 
-                    onClick={() => setIsDarkMode(!isDarkMode)} 
-                    style={{ background: 'white', border: '1px solid #cbd5e1', padding: '8px', borderRadius: '6px', cursor: 'pointer' }}
-                 >
-                    {isDarkMode ? <Sun size={18} color="#333"/> : <Moon size={18} color="#333"/>}
-                </button>
-            </div>
-
-            {/* LA HOJA DE PAPEL (Igual a ExportEngine.ts) */}
-            <div style={{ 
-                maxWidth: '800px', 
-                margin: '0 auto', 
-                background: 'white', 
-                padding: '50px', 
-                borderRadius: '8px', 
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-                color: '#1a202c'
-            }}>
-                
-                {/* Título del Libro */}
-                <h1 style={{ textAlign: 'center', color: '#2563eb', borderBottom: '2px solid #f1f5f9', paddingBottom: '15px', marginTop: 0 }}>
-                    {project.meta.title}
-                </h1>
-
-                {/* AREA DE CONTENIDO (Target para MathJax) */}
-                <div id="book-content-area" style={{ minHeight: '400px', marginTop: '30px' }}>
-                    {!currentPage ? (
-                        <div style={{ textAlign: 'center', padding: '50px', color: 'gray' }}>Cargando...</div>
-                    ) : (
-                        <div key={currentPage.id}>
-                            {/* Títulos de Página */}
-                            {currentPage.type === 'capitulo' && <h2 style={{ color: '#2563eb', borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', fontSize:'1.8em' }}>{currentPage.title}</h2>}
-                            {currentPage.type === 'seccion' && <h3 style={{ marginTop: '20px', fontSize: '1.5em', color:'#1e293b' }}>{currentPage.title}</h3>}
-                            {currentPage.type === 'portada' && <h1 style={{ textAlign: 'center', fontSize: '3em', margin: '60px 0', color: '#2563eb' }}>{currentPage.title}</h1>}
-
-                            {/* Bloques de Texto y Sims */}
-                            <div style={{ lineHeight: '1.8', fontSize: '1.1rem', textAlign: 'justify' }}>
-                                {currentPage.blocks.map(block => (
-                                    <div key={block.id} style={{ margin: '20px 0' }}>
-                                        {block.type === 'text' && (
-                                            <div dangerouslySetInnerHTML={{ __html: block.content.replace(/\n/g, '<br/>') }} />
-                                        )}
-                                        
-                                        {block.type === 'simulator' && (
-                                            <div style={{ margin: '25px 0', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '15px', background: '#f8fafc' }}>
-                                                <SimulatorRenderer 
-                                                    code={getSimulatorCode(block.simulatorId)} 
-                                                    params={block.simConfig || {}} 
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* BOTONES DE NAVEGACIÓN */}
-                {totalPages > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '50px', borderTop: '1px solid #e2e8f0', paddingTop: '30px' }}>
-                        <button 
-                            onClick={handlePrev} 
-                            disabled={readerPageIndex === 0}
-                            style={{
-                                background: readerPageIndex === 0 ? '#e2e8f0' : '#fff',
-                                color: readerPageIndex === 0 ? '#94a3b8' : '#2563eb', 
-                                border: '1px solid #cbd5e1', 
-                                padding: '10px 25px', 
-                                borderRadius: '6px', 
-                                cursor: readerPageIndex === 0 ? 'not-allowed' : 'pointer', 
-                                fontWeight: 'bold'
-                            }}
-                        >
-                            ← Anterior
-                        </button>
-
-                        <span style={{ alignSelf: 'center', color: '#64748b', fontSize: '0.9rem' }}>
-                            Página {readerPageIndex + 1} de {totalPages}
-                        </span>
-
-                        <button 
-                            onClick={handleNext} 
-                            disabled={readerPageIndex === totalPages - 1}
-                            style={{
-                                background: readerPageIndex === totalPages - 1 ? '#e2e8f0' : '#2563eb',
-                                color: readerPageIndex === totalPages - 1 ? '#94a3b8' : 'white', 
-                                border: 'none', 
-                                padding: '10px 25px', 
-                                borderRadius: '6px', 
-                                cursor: readerPageIndex === totalPages - 1 ? 'not-allowed' : 'pointer', 
-                                fontWeight: 'bold'
-                            }}
-                        >
-                            Siguiente →
-                        </button>
-                    </div>
-                )}
-            </div>
+      return (
+        <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: '#f1f5f9' }}>
+            {/* Usamos un iframe para mostrar el HTML generado.
+                Esto aísla los estilos y scripts, evitando conflictos con React.
+                Si se ve bien al descargar, ¡se verá bien aquí!
+            */}
+            <iframe 
+                title="Vista Alumno"
+                srcDoc={rawHTML}
+                style={{
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                    display: 'block'
+                }}
+                // Permitimos scripts para que MathJax y los Simuladores funcionen
+                sandbox="allow-scripts allow-same-origin allow-modals allow-popups"
+            />
         </div>
-    );
-}
+      );
+  };
 
   // ==========================================
   // VISTA 2: MODO PROFESOR (EDITOR)

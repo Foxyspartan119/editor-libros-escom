@@ -145,7 +145,22 @@ export function generateBookHTML(project: BookProject): string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${project.meta.title}</title>
     <style>${styles}</style>
-    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <script>
+      window.MathJax = {
+        tex: {
+          // Aquí le decimos qué símbolos buscar para matemáticas
+          inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], 
+          displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']],
+          processEscapes: true
+        },
+        svg: {
+          fontCache: 'global'
+        }
+      };
+    </script>
+    
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
     <div class="book-container">
