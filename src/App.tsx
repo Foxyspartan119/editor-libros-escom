@@ -3,169 +3,98 @@ import type { BookProject, Page, SimulatorAsset, NodeType, ContentBlock } from '
 import './editor_libro.css';
 import { PageEditor } from './components/PageEditor';
 import { SimulatorUploader } from './components/SimulatorUploader';
-// Importamos iconos para la interfaz
-import { Moon, Sun, Save, FolderOpen, Download, Undo, HelpCircle } from 'lucide-react'; 
+import { SimulatorRenderer } from './components/SimulatorRenderer'; 
+// Iconos: Agregamos HelpCircle y quitamos Trash2 (que no se usa aquí)
+import { Moon, Sun, Save, FolderOpen, Download, Undo, HelpCircle, CloudUpload } from 'lucide-react'; 
 import { generateBookHTML } from './engine/ExportEngine';
-import { db } from './firebase'; // Importamos la base de datos Firebase
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+
+// --- FIREBASE IMPORTS ---
+import { db } from './firebase'; 
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 const INITIAL_PROJECT: BookProject = {
-  meta: { title: "Nuevo Libro Interactivo", author: "Anon", created: Date.now(), theme: 'light' },
+  meta: { title: "Cargando...", author: "Anon", created: Date.now(), theme: 'light' },
   assets: { simulators: [] },
-  pages: [ ]
+  pages: []
 };
+
+// ID DEL LIBRO EN LA NUBE
+const CLOUD_BOOK_ID = "libro_curso_principal"; 
 
 function App() {
   const [project, setProject] = useState<BookProject>(INITIAL_PROJECT);
-  
-  // 1. ESTADO PARA EL HISTORIAL (UNDO)
   const [history, setHistory] = useState<BookProject[]>([]);
-
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  
+  // ESTADOS DE MODO
+  const [isReadOnly, setIsReadOnly] = useState(true); 
+  const [isSyncing, setIsSyncing] = useState(false); 
+
+  // --- 1. EFECTO DE INICIO (DETECTAR MODO Y CONECTAR A NUBE) ---
+  useEffect(() => {
+    // A) Detectar Admin
+    const params = new URLSearchParams(window.location.search);
+    const isAdmin = params.get('admin') === 'profe123'; 
+    setIsReadOnly(!isAdmin);
+
+    // B) Escuchar cambios en la nube (Firebase)
+    const unsubscribe = onSnapshot(doc(db, "projects", CLOUD_BOOK_ID), (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data() as BookProject;
+            console.log("☁️ Sincronizado desde la nube");
+            setProject(data);
+            
+            if (!activePageId && data.pages.length > 0) {
+                 // No forzamos cambio de página para no molestar al usuario
+            }
+        } else {
+             if(isAdmin) console.log("Listo para crear el primer libro en la nube.");
+        }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // --- EFECTO MODO OSCURO ---
   useEffect(() => {
     document.body.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
 
-  // --- SINCRONIZACIÓN CON FIREBASE ---
-  useEffect(() => {
-    // Escuchamos cambios en la colección "simulators"
-    const q = query(collection(db, "simuladores"), orderBy("timestamp", "desc"));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const simuladoresCloud = snapshot.docs.map(doc => ({
-        id: doc.id, // Usamos el ID de Firebase
-        ...doc.data()
-      })) as SimulatorAsset[];
-
-      // Actualizamos el estado del proyecto con los simuladores de la nube
-      setProject(prev => ({
-        ...prev,
-        assets: {
-          ...prev.assets,
-          simulators: simuladoresCloud
-        }
-      }));
-
-      console.log("Simuladores sincronizados desde Firebase:", simuladoresCloud);
-    });
-
-    return () => unsubscribe(); // Limpiamos el listener al desmontar
-  }, []);
-
-  // --- SISTEMA DE UNDO (DESHACER) ---
-  const pushToHistory = () => {
-    setHistory(prev => {
-        const newHist = [...prev, project];
-        if (newHist.length > 20) newHist.shift(); // Guardamos máx 20 pasos
-        return newHist;
-    });
-  };
-
-  const handleUndo = () => {
-    if (history.length === 0) return;
-    const previousState = history[history.length - 1];
-    setHistory(prev => prev.slice(0, -1));
-    setProject(previousState);
-    
-    // Intentamos mantener la página activa si existe en el estado anterior
-    if (previousState.pages.length > 0 && (!activePageId || !previousState.pages.find(p => p.id === activePageId))) {
-        setActivePageId(previousState.pages[0].id);
+  // ==========================================
+  // FUNCIONES DE NUBE (CLOUD)
+  // ==========================================
+  const saveToCloud = async () => {
+    if (isReadOnly) return;
+    setIsSyncing(true);
+    try {
+        await setDoc(doc(db, "projects", CLOUD_BOOK_ID), project);
+        alert("✅ ¡Publicado! Todos los alumnos tienen la última versión.");
+    } catch (e) {
+        console.error(e);
+        alert("❌ Error al subir a la nube.");
+    } finally {
+        setIsSyncing(false);
     }
   };
 
-  // --- GESTIÓN DE PÁGINAS ---
-  const handleAddPage = (type: NodeType = 'seccion') => {
-    pushToHistory(); 
-    const newPage: Page = {
-      id: crypto.randomUUID(), 
-      type: type,
-      title: type === 'capitulo' ? "Nuevo Capítulo" : "Nueva Sección",
-      blocks: []
-    };
-    setProject(prev => ({ ...prev, pages: [...prev.pages, newPage] }));
-    setActivePageId(newPage.id);
-  };
-
-  const handleUpdatePage = (updatedPage: Page) => {
-    setProject(prev => ({
-      ...prev,
-      pages: prev.pages.map(p => p.id === updatedPage.id ? updatedPage : p)
-    }))
-  };
-
-  // --- ESTILOS DINÁMICOS PARA EL ÍNDICE ---
-  const getIndentStyle = (type: NodeType) => {
-      switch(type) {
-          case 'capitulo': return { fontWeight: 'bold', borderLeft: '4px solid var(--brand-primary)', paddingLeft: '8px' };
-          case 'subseccion': return { paddingLeft: '30px', fontSize: '0.9em', borderLeft: '1px solid var(--border-color)' };
-          case 'portada': return { fontStyle: 'italic', color: 'var(--brand-accent)' };
-          default: return { paddingLeft: '15px' }; // seccion normal
-      }
-  };
-
-// --- FUNCIÓN INTELIGENTE: GUARDAR O ACTUALIZAR ---
-  const handleSaveSimulator = (name: string, code: string) => {
-    setProject(prev => {
-      // 1. Buscamos si ya existe uno con el mismo nombre
-      const existingIndex = prev.assets.simulators.findIndex(s => s.name === name);
-
-      let newSimulators = [...prev.assets.simulators];
-
-      if (existingIndex >= 0) {
-        // --- CASO A: ACTUALIZAR (El nombre ya existe) ---
-        // Confirmación opcional (puedes quitar el confirm si prefieres que sea directo)
-        // if (!confirm(`Ya existe un simulador llamado "${name}". ¿Deseas actualizarlo? Esto afectará a todas las páginas que lo usen.`)) {
-        //    return prev; 
-        // }
-
-        console.log(`Actualizando simulador existente: ${name}`);
-        newSimulators[existingIndex] = {
-          ...newSimulators[existingIndex], // Mantenemos el ID original
-          code: code,                      // Actualizamos el código con el error corregido
-          timestamp: Date.now()            // Actualizamos la fecha
-        };
-        alert(`¡Simulador "${name}" actualizado correctamente! Todas las páginas ahora usan la nueva versión.`);
-
-      } else {
-        // --- CASO B: CREAR NUEVO (Nombre no existe) ---
-        console.log(`Creando nuevo simulador: ${name}`);
-        const newSim: SimulatorAsset = {
-          id: "sim_" + crypto.randomUUID().slice(0, 8),
-          name: name,
-          code: code,
-          version: "1.0",
-          timestamp: Date.now()
-        };
-        newSimulators.push(newSim);
-        alert(`¡Simulador "${name}" añadido a la librería!`);
-      }
-
-      return {
-        ...prev,
-        assets: {
-          ...prev.assets,
-          simulators: newSimulators
-        }
-      };
-    });
-  };
-
-  // --- GUARDAR JSON ---
+  // ==========================================
+  // FUNCIONES LOCALES (JSON / LEGACY)
+  // ==========================================
+  
+  // 1. Guardar copia en tu PC (Backup)
   const saveProjectJSON = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(project));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", project.meta.title + ".json");
+    downloadAnchorNode.setAttribute("download", project.meta.title + "_backup.json");
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
   };
 
-  // --- CARGAR JSON (CON LÓGICA DE CONVERSIÓN RESTAURADA) ---
+  // 2. Cargar archivo (Soporte para lo de tus compañeros)
   const loadProjectJSON = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -179,90 +108,59 @@ function App() {
             if (json.meta && json.pages && !Array.isArray(json)) {
                 setProject(json);
                 setActivePageId(json.pages[0]?.id || null);
-                alert("Proyecto cargado correctamente.");
+                alert("Proyecto V2 cargado. Dale a 'PUBLICAR' para subirlo a la nube.");
                 return;
             }
 
-            // CASO B: Proyecto Legacy (Array de tus compañeros)
+            // CASO B: Proyecto Legacy (Tus compañeros)
             if (Array.isArray(json)) {
                 console.log("Detectado formato Legacy. Convirtiendo...");
-                
+                // --- LÓGICA DE CONVERSIÓN ---
                 const convertedPages: Page[] = json.map((legacyPage: any) => {
                     const blocks: ContentBlock[] = [];
                     const contentStr = legacyPage.contenido || "";
                     
-                    // Regex para encontrar [simulador:nombre]
                     const regex = /\[simulador:([a-zA-Z0-9_]+)\]/g;
                     let lastIndex = 0;
                     let match;
 
                     while ((match = regex.exec(contentStr)) !== null) {
-                        // 1. Texto antes del simulador
                         const textPart = contentStr.slice(lastIndex, match.index).trim();
-                        if (textPart) {
-                            blocks.push({
-                                id: crypto.randomUUID(),
-                                type: 'text',
-                                content: textPart
-                            });
-                        }
+                        if (textPart) blocks.push({ id: crypto.randomUUID(), type: 'text', content: textPart });
 
-                        // 2. El simulador (Placeholder legacy)
                         const simIdRaw = match[1];
                         blocks.push({
-                            id: crypto.randomUUID(),
-                            type: 'simulator',
-                            content: '',
-                            simulatorId: "legacy_" + simIdRaw, 
-                            simConfig: {}
+                            id: crypto.randomUUID(), type: 'simulator', content: '',
+                            simulatorId: "legacy_" + simIdRaw, simConfig: {}
                         });
-
                         lastIndex = regex.lastIndex;
                     }
-
-                    // 3. Texto final restante
                     const remainingText = contentStr.slice(lastIndex).trim();
-                    if (remainingText) {
-                        blocks.push({
-                            id: crypto.randomUUID(),
-                            type: 'text',
-                            content: remainingText
-                        });
-                    }
+                    if (remainingText) blocks.push({ id: crypto.randomUUID(), type: 'text', content: remainingText });
 
-                    // Intentamos mapear el tipo antiguo al nuevo
                     let pageType: NodeType = 'seccion';
                     if (legacyPage.tipo === 'capitulo') pageType = 'capitulo';
                     if (legacyPage.tipo === 'portada') pageType = 'portada';
 
                     return {
                         id: legacyPage.id || crypto.randomUUID(),
-                        type: pageType, // <--- AQUI APLICAMOS EL TIPO DETECTADO
+                        type: pageType,
                         title: legacyPage.titulo || "Sin Título",
-                        blocks: blocks.length > 0 ? blocks : [{ 
-                            id: crypto.randomUUID(), 
-                            type: 'text', 
-                            content: '' 
-                        }]
+                        blocks: blocks.length > 0 ? blocks : [{ id: crypto.randomUUID(), type: 'text', content: '' }]
                     };
                 });
 
                 const newProject: BookProject = {
-                    meta: { 
-                        title: "Proyecto Importado", 
-                        author: "Usuario", 
-                        created: Date.now(), 
-                        theme: 'light' 
-                    },
+                    meta: { title: "Libro Importado", author: "Usuario", created: Date.now(), theme: 'light' },
                     assets: { simulators: [] },
                     pages: convertedPages
                 };
 
                 setProject(newProject);
                 setActivePageId(convertedPages[0]?.id || null);
-                alert("Proyecto antiguo convertido exitosamente.\n\nIMPORTANTE: Recuerda subir los archivos .js de los simuladores usando el botón '+ Importar Simulador' para que funcionen.");
+                alert("✅ Archivo antiguo convertido. \n\nPASO SIGUIENTE:\n1. Revisa que el texto esté bien.\n2. Sube los simuladores (.js) que falten.\n3. Dale a 'PUBLICAR' para guardarlo en la nube.");
             } else {
-                alert("Formato de archivo no reconocido.");
+                alert("Formato no reconocido.");
             }
 
         } catch (error) {
@@ -274,101 +172,175 @@ function App() {
     event.target.value = ''; // Reset input
   };
 
-  // --- EXPORTAR HTML ---
-  const handleExportHTML = () => {
-      // Usamos la función importada directamente desde arriba
-      const htmlContent = generateBookHTML(project);
-      
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      
-      const a = document.createElement('a'); 
-      a.href = url; 
-      a.download = `${project.meta.title.replace(/\s+/g, '_')}_offline.html`;
-      document.body.appendChild(a); 
-      a.click(); 
-      document.body.removeChild(a); 
-      URL.revokeObjectURL(url);
+  // ==========================================
+  // FUNCIONES DE EDICIÓN
+  // ==========================================
+  const handleUndo = () => {
+    if (history.length === 0) return;
+    const previousState = history[history.length - 1];
+    setHistory(prev => prev.slice(0, -1));
+    setProject(previousState);
   };
 
+  const handleAddPage = (type: NodeType = 'seccion') => {
+    setHistory(prev => [...prev, project]);
+    const newPage: Page = {
+      id: crypto.randomUUID(), type: type, title: type === 'capitulo' ? "Nuevo Capítulo" : "Nueva Sección", blocks: []
+    };
+    setProject(prev => ({ ...prev, pages: [...prev.pages, newPage] }));
+    setActivePageId(newPage.id);
+  };
+
+  const handleUpdatePage = (updatedPage: Page) => {
+    setProject(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id === updatedPage.id ? updatedPage : p)
+    }));
+  };
+
+  const handleSaveSimulator = (name: string, code: string) => {
+    const newSim: SimulatorAsset = {
+        id: "sim_" + crypto.randomUUID().slice(0, 8),
+        name, code, version: "1.0", timestamp: Date.now()
+    };
+    setProject(prev => ({
+        ...prev,
+        assets: { ...prev.assets, simulators: [...prev.assets.simulators, newSim] }
+    }));
+  };
+
+  const getSimulatorCode = (simId?: string) => {
+      if(!simId) return "";
+      const cleanId = simId.replace('legacy_', '');
+      const sim = project.assets.simulators.find(s => s.id === simId || s.id.includes(cleanId));
+      return sim ? sim.code : "";
+  };
+
+  const handleExportHTML = () => {
+      const htmlContent = generateBookHTML(project);
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `${project.meta.title.replace(/\s+/g,'_')}_offline.html`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  };
+
+  const getIndentStyle = (type: NodeType) => {
+    switch(type) {
+        case 'capitulo': return { fontWeight: 'bold', borderLeft: '4px solid var(--brand-primary)', paddingLeft: '8px', marginTop:'10px' };
+        case 'subseccion': return { paddingLeft: '30px', fontSize: '0.9em', borderLeft: '1px solid var(--border-color)' };
+        case 'portada': return { fontStyle: 'italic', color:'var(--brand-accent)' };
+        default: return { paddingLeft: '15px' };
+    }
+  };
+
+  // ==========================================
+  // VISTA 1: MODO ALUMNO (LECTOR)
+  // ==========================================
+  if (isReadOnly) {
+      return (
+        <div className="reader-container" style={{maxWidth:'900px', margin:'0 auto', padding:'20px', fontFamily:'system-ui, sans-serif'}}>
+            <header style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'40px', paddingBottom:'20px', borderBottom:'1px solid var(--border-color)'}}>
+                <div>
+                    <h1 style={{margin:0, color:'var(--brand-primary)'}}>{project.meta.title}</h1>
+                </div>
+                <button onClick={() => setIsDarkMode(!isDarkMode)} style={{background:'none', border:'1px solid gray', padding:'5px', borderRadius:'4px', cursor:'pointer'}}>
+                    {isDarkMode ? <Sun size={18}/> : <Moon size={18}/>}
+                </button>
+            </header>
+            
+            <div className="content-area">
+                {project.pages.length === 0 && (
+                    <div style={{textAlign:'center', padding:'50px', color:'gray'}}>
+                        <p>Cargando contenido o esperando publicación...</p>
+                    </div>
+                )}
+                
+                {project.pages.map(page => (
+                    <div key={page.id} style={{marginBottom:'60px', animation:'fadeIn 0.5s'}}>
+                        {page.type === 'capitulo' && <h2 style={{color:'var(--brand-primary)', borderBottom:'2px solid #eee', paddingBottom:'10px'}}>{page.title}</h2>}
+                        {page.type === 'seccion' && <h3 style={{marginTop:'30px'}}>{page.title}</h3>}
+                        {page.type === 'subseccion' && <h4 style={{fontStyle:'italic', color:'#555'}}>{page.title}</h4>}
+                        {page.type === 'portada' && <h1 style={{textAlign:'center', fontSize:'3em', margin:'50px 0'}}>{page.title}</h1>}
+
+                        <div style={{lineHeight:'1.6'}}>
+                        {page.blocks.map(block => (
+                            <div key={block.id} style={{margin:'15px 0'}}>
+                                {block.type === 'text' && <div dangerouslySetInnerHTML={{__html: block.content.replace(/\n/g, '<br/>')}} />}
+                                {block.type === 'simulator' && (
+                                    <div style={{border:'1px solid #ddd', padding:'20px', borderRadius:'8px', background: isDarkMode ? '#1a1a1a' : '#f9fafb'}}>
+                                        <SimulatorRenderer code={getSimulatorCode(block.simulatorId)} params={block.simConfig || {}} />
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+            <footer style={{marginTop:'50px', textAlign:'center', fontSize:'0.8em', color:'gray', padding:'20px'}}>Libro Interactivo - ESCOM</footer>
+        </div>
+      );
+  }
+
+  // ==========================================
+  // VISTA 2: MODO PROFESOR (EDITOR)
+  // ==========================================
   return (
     <div className="app-container">
       <header>
         <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
             <h1>{project.meta.title}</h1>
+            <span style={{fontSize:'0.7em', background:'var(--brand-error)', color:'white', padding:'2px 6px', borderRadius:'4px'}}>EDITOR</span>
         </div>
-        
         <div className="sep"></div>
 
-        {/* --- BOTONES HEADER --- */}
+        {/* --- AQUI VOLVIÓ TU BOTÓN DE AYUDA --- */}
         <a 
             href="/ayuda.html" 
             target="_blank" 
             className="button-lookalike" 
             title="Ver Ayuda"
-            style={{textDecoration:'none', color:'inherit'}}
+            style={{textDecoration:'none', color:'inherit', display:'flex', alignItems:'center', fontSize:'0.9rem', marginRight:'10px'}}
         >
             <HelpCircle size={18} style={{marginRight:5}}/> Ayuda
         </a>
 
+        <button onClick={() => setIsDarkMode(!isDarkMode)}>{isDarkMode ? <Sun size={18}/> : <Moon size={18}/>}</button>
+        <button onClick={handleUndo} disabled={history.length === 0} title="Deshacer"><Undo size={18}/></button>
+
+        {/* GRUPO DE ACCIONES LOCALES */}
+        <div style={{display:'flex', gap:'5px', borderLeft:'1px solid #555', paddingLeft:'10px', marginLeft:'10px'}}>
+             <label className="button-lookalike" title="Importar JSON viejo">
+                <FolderOpen size={18}/>
+                <input type="file" accept=".json" onChange={loadProjectJSON} style={{display:'none'}}/>
+            </label>
+            <button onClick={saveProjectJSON} title="Guardar Respaldo Local (JSON)"><Save size={18}/></button>
+        </div>
+
+        {/* GRUPO DE NUBE */}
         <button 
-            onClick={handleUndo} 
-            disabled={history.length === 0}
-            title="Deshacer último cambio"
+            onClick={saveToCloud} 
+            disabled={isSyncing}
+            style={{background:'var(--brand-success)', color:'white', borderColor:'var(--brand-success)', fontWeight:'bold', marginLeft:'auto'}}
         >
-            <Undo size={18}/> Deshacer
-        </button>
-
-        <div className="sep" style={{flex:0, width:'1px', height:'20px', margin:'0 10px'}}></div>
-
-        <button onClick={() => setIsDarkMode(!isDarkMode)}>
-            {isDarkMode ? <Sun size={18}/> : <Moon size={18}/>}
-        </button>
-
-        <label htmlFor="load-project-input" className="button-lookalike">
-            <FolderOpen size={18} style={{marginRight:5}}/> Cargar
-        </label>
-        <input 
-            id="load-project-input" 
-            type="file" 
-            accept=".json" 
-            onChange={loadProjectJSON} 
-            style={{display:'none'}}
-        />
-
-        <button id="btnGuardar" onClick={saveProjectJSON} style={{display:'flex', alignItems:'center', gap:'5px'}}>
-            <Save size={18}/> Guardar
+            {isSyncing ? 'Subiendo...' : <><CloudUpload size={18} style={{marginRight:5}}/> PUBLICAR</>}
         </button>
         
-        <button id="btnDescargar" onClick={handleExportHTML} style={{display:'flex', alignItems:'center', gap:'5px'}}>
-            <Download size={18}/> Exportar
-        </button>
+        <button onClick={handleExportHTML} title="Descargar HTML Offline"><Download size={18}/></button>
       </header>
   
       <div className="layout">
         <aside className="toc">
           <h2>Contenido</h2>
-          
-          {/* --- BARRA LATERAL (Botones Divididos) --- */}
           <div className="toolbar" style={{display:'flex', gap:'5px', flexWrap:'wrap'}}>
-            <button onClick={() => handleAddPage('capitulo')} style={{flex:1, fontSize:'0.8rem'}}>+ Cap</button>
-            <button onClick={() => handleAddPage('seccion')} style={{flex:1, fontSize:'0.8rem'}}>+ Sec</button>
-            
-            <button 
-              onClick={() => setIsUploadModalOpen(true)}
-              style={{ width:'100%', marginTop:'5px', backgroundColor: 'var(--brand-success)', color:'white', borderColor: 'var(--brand-success)'} }
-              >+ Simulador</button>
+            <button onClick={() => handleAddPage('capitulo')}>+ Cap</button>
+            <button onClick={() => handleAddPage('seccion')}>+ Sec</button>
+            <button onClick={() => setIsUploadModalOpen(true)} style={{flexBasis:'100%'}}>+ Simulador</button>
           </div>
-
           <ul style={{ marginTop: '1rem' }}>
             {project.pages.map(page => (
-              <li
-                key={page.id}
-                className={page.id === activePageId ? 'selected' : ''}
-                style={getIndentStyle(page.type)}
-                onClick={() => setActivePageId(page.id)}
-              >
-                {page.type === 'capitulo' ? page.title.toUpperCase() : page.title}
+              <li key={page.id} className={page.id === activePageId ? 'selected' : ''} style={getIndentStyle(page.type)} onClick={() => setActivePageId(page.id)}>
+                {page.title || "Sin título"}
               </li>
             ))}
           </ul>
@@ -378,58 +350,18 @@ function App() {
           {activePageId ? (
             (() => {
               const activePage = project.pages.find(p => p.id === activePageId);
-              if (!activePage) return <p className="error">Página no encontrada.</p>;
-              return (
-                <PageEditor
-                  page={activePage}
-                  availableSimulators={project.assets.simulators}
-                  onUpdatePage={handleUpdatePage}
-                />
-              );
+              if (!activePage) return <p>Error cargando página</p>;
+              return <PageEditor page={activePage} availableSimulators={project.assets.simulators} onUpdatePage={handleUpdatePage} />;
             })()
-          ) : project.pages.length === 0 ? (
-            <div className="empty-state">
-              <h3>¡Bienvenido!</h3>
-              <p>Comienza añadiendo un Capítulo.</p>
-            </div>
-          ) : (
-            <div className="info">
-              Selecciona una página para editar.
-            </div>
-          )}
+          ) : <div className="empty-state">
+              <p>Selecciona una página o carga un proyecto.</p>
+          </div>}
         </main>
       </div>
 
-      <SimulatorUploader
-        isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
-        onSave={handleSaveSimulator}
-      />
+      <SimulatorUploader isOpen={isUploadModalOpen} onClose={() => setIsUploadModalOpen(false)} onSave={handleSaveSimulator} />
     </div>
   );
 }
-
-const styleSheet = document.createElement("style");
-styleSheet.innerText = `
-  .button-lookalike {
-    font-family: var(--font-sans);
-    font-size: 0.9rem;
-    padding: var(--space-sm) var(--space-md);
-    border: 1px solid var(--border-color);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    cursor: pointer;
-    border-radius: var(--radius);
-    display: flex;
-    align-items: center;
-    font-weight: 600;
-    transition: all var(--transition-fast);
-  }
-  .button-lookalike:hover {
-    background: var(--bg-secondary);
-    border-color: var(--brand-primary);
-  }
-`;
-document.head.appendChild(styleSheet);
 
 export default App;
