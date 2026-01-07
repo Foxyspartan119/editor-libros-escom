@@ -6,6 +6,8 @@ import { SimulatorUploader } from './components/SimulatorUploader';
 // Importamos iconos para la interfaz
 import { Moon, Sun, Save, FolderOpen, Download, Undo, HelpCircle } from 'lucide-react'; 
 import { generateBookHTML } from './engine/ExportEngine';
+import { db } from './firebase'; // Importamos la base de datos Firebase
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 const INITIAL_PROJECT: BookProject = {
   meta: { title: "Nuevo Libro Interactivo", author: "Anon", created: Date.now(), theme: 'light' },
@@ -27,6 +29,32 @@ function App() {
   useEffect(() => {
     document.body.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
+
+  // --- SINCRONIZACIÓN CON FIREBASE ---
+  useEffect(() => {
+    // Escuchamos cambios en la colección "simulators"
+    const q = query(collection(db, "simuladores"), orderBy("timestamp", "desc"));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const simuladoresCloud = snapshot.docs.map(doc => ({
+        id: doc.id, // Usamos el ID de Firebase
+        ...doc.data()
+      })) as SimulatorAsset[];
+
+      // Actualizamos el estado del proyecto con los simuladores de la nube
+      setProject(prev => ({
+        ...prev,
+        assets: {
+          ...prev.assets,
+          simulators: simuladoresCloud
+        }
+      }));
+
+      console.log("Simuladores sincronizados desde Firebase:", simuladoresCloud);
+    });
+
+    return () => unsubscribe(); // Limpiamos el listener al desmontar
+  }, []);
 
   // --- SISTEMA DE UNDO (DESHACER) ---
   const pushToHistory = () => {
@@ -79,19 +107,51 @@ function App() {
       }
   };
 
+// --- FUNCIÓN INTELIGENTE: GUARDAR O ACTUALIZAR ---
   const handleSaveSimulator = (name: string, code: string) => {
-    const newSim: SimulatorAsset = {
-      id: "sim_" + crypto.randomUUID().slice(0, 8),
-      name: name,
-      code: code,
-      version: "1.0",
-      timestamp: Date.now()
-    };
-    setProject(prev => ({
-      ...prev,
-      assets: { ...prev.assets, simulators: [...prev.assets.simulators, newSim] }
-    }));
-    alert(`¡Simulador "${name}" añadido a la librería!`);
+    setProject(prev => {
+      // 1. Buscamos si ya existe uno con el mismo nombre
+      const existingIndex = prev.assets.simulators.findIndex(s => s.name === name);
+
+      let newSimulators = [...prev.assets.simulators];
+
+      if (existingIndex >= 0) {
+        // --- CASO A: ACTUALIZAR (El nombre ya existe) ---
+        // Confirmación opcional (puedes quitar el confirm si prefieres que sea directo)
+        // if (!confirm(`Ya existe un simulador llamado "${name}". ¿Deseas actualizarlo? Esto afectará a todas las páginas que lo usen.`)) {
+        //    return prev; 
+        // }
+
+        console.log(`Actualizando simulador existente: ${name}`);
+        newSimulators[existingIndex] = {
+          ...newSimulators[existingIndex], // Mantenemos el ID original
+          code: code,                      // Actualizamos el código con el error corregido
+          timestamp: Date.now()            // Actualizamos la fecha
+        };
+        alert(`¡Simulador "${name}" actualizado correctamente! Todas las páginas ahora usan la nueva versión.`);
+
+      } else {
+        // --- CASO B: CREAR NUEVO (Nombre no existe) ---
+        console.log(`Creando nuevo simulador: ${name}`);
+        const newSim: SimulatorAsset = {
+          id: "sim_" + crypto.randomUUID().slice(0, 8),
+          name: name,
+          code: code,
+          version: "1.0",
+          timestamp: Date.now()
+        };
+        newSimulators.push(newSim);
+        alert(`¡Simulador "${name}" añadido a la librería!`);
+      }
+
+      return {
+        ...prev,
+        assets: {
+          ...prev.assets,
+          simulators: newSimulators
+        }
+      };
+    });
   };
 
   // --- GUARDAR JSON ---

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { loadSimulatorFromCode } from '../engine/SimulatorLoader';
 import { Upload, X, CheckCircle, AlertTriangle, Eye } from 'lucide-react';
 import { SimulatorRenderer } from './SimulatorRenderer'; // <--- IMPORTAMOS ESTO
+import { db } from '../firebase'; // Importamos la base de datos
+import { doc, setDoc, getDocs, collection, query, where } from 'firebase/firestore';
 
 interface SimulatorUploaderProps {
   isOpen: boolean;
@@ -39,10 +41,43 @@ export const SimulatorUploader: React.FC<SimulatorUploaderProps> = ({ isOpen, on
     }
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (code && name) {
-      onSave(name, code);
-      handleClose();
+      setStatus('validating'); // Reusamos el estado para mostrar "Subiendo..."
+      
+      try {
+        // 1. Buscamos si ya existe un simulador con ese nombre en la nube
+        const q = query(collection(db, "simuladores"), where("name", "==", name));
+        const querySnapshot = await getDocs(q);
+        
+        let docId = "sim_" + crypto.randomUUID().slice(0, 8); // ID nuevo por defecto
+        
+        // Si ya existe, usamos SU id para sobrescribirlo (Update)
+        if (!querySnapshot.empty) {
+            docId = querySnapshot.docs[0].id;
+            if(!confirm(`El simulador "${name}" ya existe en la nube. ¿Quieres actualizarlo para TODOS los usuarios?`)) {
+                setStatus('idle');
+                return;
+            }
+        }
+
+        // 2. Guardamos/Actualizamos en Firestore
+        await setDoc(doc(db, "simuladores", docId), {
+            id: docId,
+            name: name,
+            code: code,
+            version: "1.0",
+            timestamp: Date.now()
+        });
+
+        alert("¡Simulador guardado en la nube! Todos los usuarios lo verán al instante.");
+        handleClose();
+
+      } catch (e) {
+          console.error(e);
+          setErrorMessage("Error al conectar con la base de datos.");
+          setStatus('error');
+      }
     }
   };
 
