@@ -3,8 +3,7 @@ import type { BookProject, Page, SimulatorAsset, NodeType, ContentBlock } from '
 import './editor_libro.css';
 import { PageEditor } from './components/PageEditor';
 import { SimulatorUploader } from './components/SimulatorUploader';
-// import { SimulatorRenderer } from './components/SimulatorRenderer'; 
-// Iconos: Agregamos HelpCircle y quitamos Trash2 (que no se usa aquí)
+// Eliminamos SimulatorRenderer de los imports porque ya no se usa en este archivo
 import { Moon, Sun, Save, FolderOpen, Download, Undo, HelpCircle, CloudUpload, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'; 
 import { generateBookHTML } from './engine/ExportEngine';
 
@@ -41,8 +40,7 @@ function App() {
   // Memoria para la nube
   const [cloudSimulators, setCloudSimulators] = useState<SimulatorAsset[]>([]);
 
-  // Indice de la página que está leyendo el alumno
-  //const [readerPageIndex, setReaderPageIndex] = useState(0);
+  // (Eliminado readerPageIndex porque el iframe maneja su propia navegación)
 
   // --- 1. EFECTO DE INICIO (DETECTAR MODO Y CONECTAR A NUBE) ---
   useEffect(() => {
@@ -57,8 +55,7 @@ function App() {
             const data = docSnap.data() as BookProject;
             console.log("☁️ Sincronizado desde la nube");
             setProject(data);
-            
-          //  setReaderPageIndex(0); Reiniciar al inicio
+            // Eliminado setReaderPageIndex(0)
         } else {
              if(isAdmin) console.log("Listo para crear el primer libro en la nube.");
         }
@@ -69,7 +66,6 @@ function App() {
 
 // --- ANTENA 2: ESCUCHAR SIMULADORES (VERSIÓN ROBUSTA) ---
   useEffect(() => {
-    // 1. Quitamos 'orderBy' temporalmente para evitar errores de índice silenciosos
     const q = query(collection(db, "simuladores")); 
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -79,7 +75,7 @@ function App() {
       })) as SimulatorAsset[];
 
       console.log("🎮 Lista de Nube cargada:", sims.length, sims);
-      setCloudSimulators(sims); // <--- GUARDAMOS EN LA VARIABLE SEGURA
+      setCloudSimulators(sims); 
     });
 
     return () => unsubscribe();
@@ -210,9 +206,9 @@ function App() {
     setProject(previousState);
   };
 
-  // --- GESTIÓN DE ORDEN DE PÁGINAS (FASE 3) ---
+  // --- GESTIÓN DE ORDEN DE PÁGINAS ---
   const handleMovePage = (pageId: string, direction: -1 | 1, e: React.MouseEvent) => {
-    e.stopPropagation(); // Evita que se seleccione la página al hacer click en la flecha
+    e.stopPropagation(); 
     const index = project.pages.findIndex(p => p.id === pageId);
     if (index < 0) return;
     const targetIndex = index + direction;
@@ -222,14 +218,13 @@ function App() {
 
     // Clonar y mover
     const newPages = [...project.pages];
-    [newPages[index], newPages[targetIndex]] = [newPages[targetIndex], newPages[index]]; // Intercambio mágico
+    [newPages[index], newPages[targetIndex]] = [newPages[targetIndex], newPages[index]]; 
     
     setProject(prev => ({ ...prev, pages: newPages }));
   };
 
   const handleDeletePage = (pageId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    // Confirmación de seguridad
     if (!confirm("⚠️ ¿Estás seguro de eliminar esta página?\nSe perderá todo el texto y simuladores que tenga dentro.")) return;
     
     setProject(prev => ({
@@ -237,7 +232,6 @@ function App() {
         pages: prev.pages.filter(p => p.id !== pageId)
     }));
     
-    // Si borramos la página que estábamos viendo, deseleccionar
     if (activePageId === pageId) setActivePageId(null);
   };
 
@@ -268,12 +262,7 @@ function App() {
     }));
   };
 
-  /*const getSimulatorCode = (simId?: string) => {
-      if(!simId) return "";
-      const cleanId = simId.replace('legacy_', '');
-      const sim = project.assets.simulators.find(s => s.id === simId || s.id.includes(cleanId));
-      return sim ? sim.code : "";
-  };*/
+  // (Eliminada funcion getSimulatorCode porque no se usa aquí)
 
   const handleExportHTML = () => {
       const htmlContent = generateBookHTML(project);
@@ -292,19 +281,14 @@ function App() {
     }
   };
 
-// ==========================================
+  // ==========================================
   // VISTA 1: MODO ALUMNO (SOLUCIÓN IFRAME "ESPEJO")
   // ==========================================
   if (isReadOnly) {
-      // 1. Generamos el HTML "en vivo" usando tu motor de exportación corregido
       const rawHTML = generateBookHTML(project);
 
       return (
         <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: '#f1f5f9' }}>
-            {/* Usamos un iframe para mostrar el HTML generado.
-                Esto aísla los estilos y scripts, evitando conflictos con React.
-                Si se ve bien al descargar, ¡se verá bien aquí!
-            */}
             <iframe 
                 title="Vista Alumno"
                 srcDoc={rawHTML}
@@ -314,12 +298,11 @@ function App() {
                     border: 'none',
                     display: 'block'
                 }}
-                // Permitimos scripts para que MathJax y los Simuladores funcionen
                 sandbox="allow-scripts allow-same-origin allow-modals allow-popups"
             />
         </div>
       );
-  };
+  }
 
   // ==========================================
   // VISTA 2: MODO PROFESOR (EDITOR)
@@ -333,7 +316,6 @@ function App() {
         </div>
         <div className="header-sep"></div>
 
-        {/* --- AQUI VOLVIÓ TU BOTÓN DE AYUDA --- */}
         <a 
             href="ayuda.html" 
             target="_blank" 
@@ -352,7 +334,6 @@ function App() {
 
     <div className="header-sep"></div>
 
-        {/* GRUPO DE ACCIONES LOCALES */}
         <div className="local-actions-group">
              <label className="icon-button" title="Importar JSON viejo">
                 <FolderOpen size={18}/>
@@ -361,7 +342,6 @@ function App() {
             <button className="icon-button" onClick={saveProjectJSON} title="Guardar Respaldo Local (JSON)"><Save size={18}/></button>
         </div>
 
-        {/* GRUPO DE NUBE */}
         <button 
             onClick={saveToCloud} 
             disabled={isSyncing}
@@ -389,12 +369,10 @@ function App() {
                 style={getIndentStyle(page.type)}
                 onClick={() => setActivePageId(page.id)}
               >
-                {/* Título de la página */}
                 <span className="page-title-span" title={page.title}>
                     {page.title || "Sin título"}
                 </span>
 
-                {/* --- SUPERPODERES: BOTONES FLOTANTES --- */}
                 {!isReadOnly && (
                     <div className="page-actions">
                         <button 
@@ -434,7 +412,6 @@ function App() {
             (() => {
               const activePage = project.pages.find(p => p.id === activePageId);
               if (!activePage) return <p>Error cargando página</p>;
-              // Fusion de listas de simuladores (locales + nube)
               const allSims = [...cloudSimulators];
               return (
               <PageEditor 
