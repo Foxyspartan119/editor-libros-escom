@@ -3,6 +3,7 @@ import type { BookProject, Page, SimulatorAsset, NodeType, ContentBlock } from '
 import './editor_libro.css';
 import { PageEditor } from './components/PageEditor';
 import { SimulatorUploader } from './components/SimulatorUploader';
+// Iconos
 import { Moon, Sun, Save, FolderOpen, Download, Undo, HelpCircle, CloudUpload, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'; 
 import { generateBookHTML } from './engine/ExportEngine';
 
@@ -121,12 +122,79 @@ function App() {
                 return;
             }
 
-            // CASO B: Proyecto Legacy
+            // CASO B: Proyecto Legacy (Tus compañeros)
             if (Array.isArray(json)) {
-                // ... (Tu lógica de conversión legacy se mantiene igual si la necesitas) ...
-                // Por brevedad, asumo que ya convertiste tus viejos archivos
-                alert("Por favor usa un JSON en formato nuevo (V2).");
-            } 
+                console.log("Detectado formato Legacy. Convirtiendo...");
+                // --- LÓGICA DE CONVERSIÓN QUE FALTABA ---
+                const convertedPages: Page[] = json.map((legacyPage: any) => {
+                    const blocks: ContentBlock[] = []; // <--- USO EXPLÍCITO DE ContentBlock
+                    const contentStr = legacyPage.contenido || "";
+                    
+                    // Regex para encontrar [simulador:id]
+                    const regex = /\[simulador:([a-zA-Z0-9_]+)\]/g;
+                    let lastIndex = 0;
+                    let match;
+
+                    while ((match = regex.exec(contentStr)) !== null) {
+                        // 1. Texto antes del simulador
+                        const textPart = contentStr.slice(lastIndex, match.index).trim();
+                        if (textPart) {
+                            blocks.push({ 
+                                id: crypto.randomUUID(), 
+                                type: 'text', 
+                                content: textPart 
+                            });
+                        }
+
+                        // 2. El simulador
+                        const simIdRaw = match[1];
+                        blocks.push({
+                            id: crypto.randomUUID(), 
+                            type: 'simulator', 
+                            content: '',
+                            simulatorId: "legacy_" + simIdRaw, 
+                            simConfig: {}
+                        });
+                        lastIndex = regex.lastIndex;
+                    }
+                    
+                    // 3. Texto final
+                    const remainingText = contentStr.slice(lastIndex).trim();
+                    if (remainingText) {
+                        blocks.push({ 
+                            id: crypto.randomUUID(), 
+                            type: 'text', 
+                            content: remainingText 
+                        });
+                    }
+
+                    // Determinar tipo de página
+                    let pageType: NodeType = 'seccion';
+                    if (legacyPage.tipo === 'capitulo') pageType = 'capitulo';
+                    if (legacyPage.tipo === 'portada') pageType = 'portada';
+
+                    return {
+                        id: legacyPage.id || crypto.randomUUID(),
+                        type: pageType,
+                        title: legacyPage.titulo || "Sin Título",
+                        blocks: blocks.length > 0 ? blocks : [{ id: crypto.randomUUID(), type: 'text', content: '' }]
+                    };
+                });
+
+                // Crear el proyecto convertido
+                const newProject: BookProject = {
+                    meta: { title: "Libro Importado (Legacy)", author: "Usuario", created: Date.now(), theme: 'light' },
+                    assets: { simulators: [] },
+                    pages: convertedPages
+                };
+
+                setProject(newProject);
+                setActivePageId(convertedPages[0]?.id || null);
+                alert("✅ Archivo antiguo convertido correctamente. Revisa y dale a PUBLICAR.");
+            } else {
+                alert("Formato no reconocido.");
+            }
+
         } catch (error) {
             console.error(error);
             alert("Error al leer el archivo JSON.");
