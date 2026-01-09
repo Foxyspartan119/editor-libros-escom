@@ -11,6 +11,8 @@ import { generateBookHTML } from './engine/ExportEngine';
 import { db } from './firebase'; 
 import { doc, onSnapshot, setDoc, collection, query } from 'firebase/firestore';
 
+const TEAM_MEMBERS = "Garcia Espinosa Ricardo Zadkiel, Ruiz Estrella Gabriel, Rojas Agustín Daniel Iván, Solís Xicale Jesús Eliuth, Aguilar Cruz Jonathan Yael y Merino Estevez Abraham Osmar";
+
 declare global {
     interface Window {
         MathJax: any;
@@ -333,6 +335,11 @@ const handleExportHTML = () => {
             <h1>{project.meta.title}</h1>
             <span style={{fontSize:'0.7em', background:'var(--brand-primary)', color:'white', padding:'2px 6px', borderRadius:'4px'}}>EDITOR MAESTRO</span>
         </div>
+        <div style={{marginLeft:'20px', fontSize:'0.85rem', color:'var(--text-secondary)', borderLeft:'1px solid #ccc', paddingLeft:'15px'}}>
+          <small style={{display:'block', fontWeight:'bold', opacity:0.7}}>Equipo de Desarrollo:</small>
+          {TEAM_MEMBERS}
+        </div>
+        
         <div className="header-sep"></div>
 
         <a href="ayuda.html" target="_blank" className="button-link" title="Ver Ayuda">

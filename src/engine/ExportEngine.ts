@@ -1,6 +1,8 @@
 import type { BookProject } from "../types";
 
 export function generateBookHTML(project: BookProject): string {
+
+    const CREDITOS = "Garcia Espinosa Ricardo Zadkiel, Ruiz Estrella Gabriel, Rojas Agustín Daniel Iván, Solís Xicale Jesús Eliuth, Aguilar Cruz Jonathan Yael y Merino Estevez Abraham Osmar";
   // 1. Estilos Base (Limpio y profesional)
   const styles = `
     :root { --bg-primary: #ffffff; --text-primary: #1a202c; --brand-primary: #2563eb; --bg-secondary: #f8fafc; --border-color: #e2e8f0; }
@@ -185,6 +187,12 @@ export function generateBookHTML(project: BookProject): string {
             <button id="btn-next">Siguiente</button>
         </div>
     </div>
+
+    <footer style="margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
+            <p><strong>Proyecto de Probabilidad y Estadística</strong></p>
+            <p>Desarrollado por: ${CREDITOS}</p>
+            <p style="font-size: 0.8em; opacity: 0.7;">Generado con React Editor Engine • IPN 2026</p>
+    </footer>
     
     <script>${projectDataScript}</script>
     
