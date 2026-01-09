@@ -274,31 +274,22 @@ function App() {
     }));
   };
 
-  const handleExportHTML = () => {
-      // ESTRATEGIA DE SEGURIDAD PARA SIMULADORES:
-      // 1. Tomamos los simuladores que están en el proyecto actual (memoria local)
-      const localSims = project.assets.simulators || [];
-      
-      // 2. Tomamos los de la nube (si existen y se cargaron)
+const handleExportHTML = () => {
+      // --- BLOQUE DE SEGURIDAD ---
+      // Usamos '?.' para que si 'assets' no existe, no explote y use un array vacío []
+      const localSims = project.assets?.simulators || [];
       const cloudSims = cloudSimulators || [];
 
-      // 3. Los combinamos evitando duplicados (priorizando la versión más reciente o local)
-      // Creamos un mapa por ID
+      console.log("Exportando...", { local: localSims.length, cloud: cloudSims.length });
+
+      // Combinar simuladores (mismo ID = gana el local por ser más reciente)
       const mergedSimsMap = new Map();
-      
-      // Primero agregamos los de la nube
       cloudSims.forEach(sim => mergedSimsMap.set(sim.id, sim));
-      
-      // Luego sobreescribimos con los locales (que podrían ser más recientes si acabas de editar)
       localSims.forEach(sim => mergedSimsMap.set(sim.id, sim));
 
       const finalSimulatorsList = Array.from(mergedSimsMap.values());
 
-      if (finalSimulatorsList.length === 0) {
-          alert("⚠️ Advertencia: No se encontraron simuladores para exportar. Asegúrate de haber guardado al menos uno.");
-      }
-
-      // Creamos el objeto final para exportar
+      // Crear copia segura del proyecto para exportar
       const projectToExport = { 
           ...project, 
           assets: { 
@@ -312,14 +303,14 @@ function App() {
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a'); 
           a.href = url; 
-          a.download = `${project.meta.title.replace(/\s+/g,'_')}_completo.html`;
+          a.download = `${(project.meta?.title || "Libro").replace(/\s+/g,'_')}_completo.html`;
           document.body.appendChild(a); 
           a.click(); 
           document.body.removeChild(a); 
           URL.revokeObjectURL(url);
       } catch (error) {
-          console.error("Error exportando:", error);
-          alert("Hubo un error al generar el archivo HTML. Revisa la consola.");
+          console.error("🔥 Error crítico al exportar:", error);
+          alert("Algo falló al crear el HTML. Abre la consola (F12) para ver el error exacto.");
       }
   };
 
