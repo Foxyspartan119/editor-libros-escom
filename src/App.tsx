@@ -262,16 +262,52 @@ function App() {
   };
 
   const handleExportHTML = () => {
-      // Pasamos los simuladores de la nube al motor de exportación para que no falte ninguno
+      // ESTRATEGIA DE SEGURIDAD PARA SIMULADORES:
+      // 1. Tomamos los simuladores que están en el proyecto actual (memoria local)
+      const localSims = project.assets.simulators || [];
+      
+      // 2. Tomamos los de la nube (si existen y se cargaron)
+      const cloudSims = cloudSimulators || [];
+
+      // 3. Los combinamos evitando duplicados (priorizando la versión más reciente o local)
+      // Creamos un mapa por ID
+      const mergedSimsMap = new Map();
+      
+      // Primero agregamos los de la nube
+      cloudSims.forEach(sim => mergedSimsMap.set(sim.id, sim));
+      
+      // Luego sobreescribimos con los locales (que podrían ser más recientes si acabas de editar)
+      localSims.forEach(sim => mergedSimsMap.set(sim.id, sim));
+
+      const finalSimulatorsList = Array.from(mergedSimsMap.values());
+
+      if (finalSimulatorsList.length === 0) {
+          alert("⚠️ Advertencia: No se encontraron simuladores para exportar. Asegúrate de haber guardado al menos uno.");
+      }
+
+      // Creamos el objeto final para exportar
       const projectToExport = { 
           ...project, 
-          assets: { simulators: [...cloudSimulators] } // Usamos la lista completa de la nube
+          assets: { 
+              simulators: finalSimulatorsList 
+          } 
       };
-      const htmlContent = generateBookHTML(projectToExport);
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = `${project.meta.title.replace(/\s+/g,'_')}_offline.html`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+
+      try {
+          const htmlContent = generateBookHTML(projectToExport);
+          const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a'); 
+          a.href = url; 
+          a.download = `${project.meta.title.replace(/\s+/g,'_')}_completo.html`;
+          document.body.appendChild(a); 
+          a.click(); 
+          document.body.removeChild(a); 
+          URL.revokeObjectURL(url);
+      } catch (error) {
+          console.error("Error exportando:", error);
+          alert("Hubo un error al generar el archivo HTML. Revisa la consola.");
+      }
   };
 
   const getIndentStyle = (type: NodeType) => {
