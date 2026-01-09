@@ -24,7 +24,7 @@ const INITIAL_PROJECT: BookProject = {
 };
 
 // ID DEL LIBRO EN LA NUBE
-// const CLOUD_BOOK_ID = "libro_curso_principal"; 
+const CLOUD_BOOK_ID = "libro_curso_principal"; 
 
 function App() {
   const [project, setProject] = useState<BookProject>(INITIAL_PROJECT);
@@ -39,26 +39,21 @@ function App() {
   // Memoria para la nube
   const [cloudSimulators, setCloudSimulators] = useState<SimulatorAsset[]>([]);
 
-  const [currentBookId, setCurrentBookId] = useState("libro_curso_principal");
-
-// --- 1. EFECTO DE INICIO (CONECTAR A NUBE) ---
+  // --- 1. EFECTO DE INICIO (CONECTAR A NUBE) ---
   useEffect(() => {
-    console.log("📡 Conectando al canal:", currentBookId);
-    
-    // Usamos la variable de estado currentBookId en lugar de la constante
-    const unsubscribe = onSnapshot(doc(db, "projects", currentBookId), (docSnap) => {
+    // Escuchar cambios en la nube (Firebase)
+    const unsubscribe = onSnapshot(doc(db, "projects", CLOUD_BOOK_ID), (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data() as BookProject;
-            // Solo actualizamos si lo que hay en la nube es diferente a lo que tenemos
-            // (Evita bucles infinitos, aunque React suele manejarlo bien)
+            console.log("☁️ Sincronizado desde la nube");
             setProject(data);
         } else {
-             console.log("Este libro aún no existe en la nube (listo para crearlo).");
+             console.log("Listo para crear el primer libro en la nube.");
         }
     });
 
     return () => unsubscribe();
-  }, [currentBookId]); // <--- ¡IMPORTANTE! Agregamos esto al array de dependencias
+  }, []);
 
   // --- 2. ESCUCHAR SIMULADORES ---
   useEffect(() => {
@@ -87,9 +82,8 @@ function App() {
   const saveToCloud = async () => {
     setIsSyncing(true);
     try {
-        // Usamos currentBookId aquí también
-        await setDoc(doc(db, "projects", currentBookId), project);
-        alert(`✅ ¡Guardado en la nube bajo el ID: "${currentBookId}"!`);
+        await setDoc(doc(db, "projects", CLOUD_BOOK_ID), project);
+        alert("✅ ¡Publicado! Todos los cambios están en la nube.");
     } catch (e) {
         console.error(e);
         alert("❌ Error al subir a la nube.");
@@ -124,14 +118,7 @@ function App() {
             if (json.meta && json.pages && !Array.isArray(json)) {
                 setProject(json);
                 setActivePageId(json.pages[0]?.id || null);
-                const newId = json.meta.title
-                    .toLowerCase()
-                    .trim()
-                    .replace(/[^a-z0-9]+/g, '_'); // Reemplaza espacios y raros por guiones bajos
-                
-                setCurrentBookId(newId); // <--- CAMBIAMOS DE CANAL
-                
-                alert(`Libro cargado. Ahora estás editando en el canal de nube: "${newId}"`);
+                alert("Proyecto cargado. Dale a 'PUBLICAR' para subirlo a la nube.");
                 return;
             }
 
