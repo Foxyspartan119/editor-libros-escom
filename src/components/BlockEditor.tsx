@@ -1,120 +1,128 @@
-// src/components/BlockEditor.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { ContentBlock, SimulatorAsset } from '../types';
 import { SimulatorRenderer } from './SimulatorRenderer';
-import { Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Trash2, ArrowUp, ArrowDown, GripVertical, Type, Gamepad2 } from 'lucide-react';
 
 interface BlockEditorProps {
-    block: ContentBlock;
-    availableSimulators: SimulatorAsset[];
-    onUpdate: (updatedBlock: ContentBlock) => void;
-    onDelete: () => void;
-    onMoveUp: () => void;
-    onMoveDown: () => void;
-    isFirst: boolean;
-    isLast: boolean;
+  block: ContentBlock;
+  availableSimulators: SimulatorAsset[];
+  onUpdate: (updatedBlock: ContentBlock) => void;
+  onDelete: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  isFirst: boolean;
+  isLast: boolean;
 }
 
 export const BlockEditor: React.FC<BlockEditorProps> = ({
-    block,
-    availableSimulators,
-    onUpdate,
-    onDelete,
-    onMoveUp,
-    onMoveDown,
-    isFirst,
-    isLast
+  block,
+  availableSimulators,
+  onUpdate,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+  isFirst,
+  isLast
 }) => {
-    
-    // Función para actualizar texto
-    const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        onUpdate({ ...block, content: e.target.value });
-    };
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onUpdate({ ...block, content: e.target.value });
+  };
 
-    // Función para cambiar el simulador seleccionado
-    const handleSimulatorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const simId = e.target.value;
-        onUpdate({
-            ...block,
-            simulatorId: simId,
-            simConfig: {} // Reiniciamos parámetros al cambiar de simulador
-        });
-    };
+  const handleSimulatorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const simId = e.target.value;
+    onUpdate({
+      ...block,
+      simulatorId: simId,
+      simConfig: {}
+    });
+  };
 
-    // Buscamos el simulador actual en la lista
-    const currentSimAsset = availableSimulators.find(s => s.id === block.simulatorId);
+  const currentSimAsset = useMemo(
+    () => availableSimulators.find(s => s.id === block.simulatorId),
+    [availableSimulators, block.simulatorId]
+  );
 
-    return (
-        <div className="paper-container fade-in" style={{ position: 'relative', padding: '1rem', border: '1px solid var(--border-color)', marginBottom: '1rem' }}>
+  const kindLabel = block.type === 'simulator' ? 'Simulador' : 'Texto / LaTeX';
 
-            {/* BARRA DE HERRAMIENTAS */}
-            <div className="toolbar-line" style={{ justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span className="badge">
-                    {block.type === 'simulator' ? '🎮 Simulador' : '📝 Texto / LaTeX'}
-                </span>
+  return (
+    <section className={`block-card fade-in ${block.type === 'simulator' ? 'is-sim' : 'is-text'}`}>
+      <div className="block-toolbar">
+        <div className="block-left">
+          <span className="block-grip" title="Bloque">
+            <GripVertical size={16} />
+          </span>
 
-                <div style={{ display: 'flex', gap: '4px' }}>
-                    <button onClick={onMoveUp} disabled={isFirst} title="Subir">
-                        <ArrowUp size={16} />
-                    </button>
-                    <button onClick={onMoveDown} disabled={isLast} title="Bajar">
-                        <ArrowDown size={16} />
-                    </button>
-                    <button onClick={onDelete} className="delete-btn" style={{ color: 'var(--brand-error)', borderColor: 'var(--brand-error)' }} title="Eliminar">
-                        <Trash2 size={16} />
-                    </button>
-                </div>
+          <span className={`block-tag ${block.type === 'simulator' ? 'sim' : 'text'}`}>
+            {block.type === 'simulator' ? <Gamepad2 size={14} /> : <Type size={14} />}
+            {kindLabel}
+          </span>
+
+          {block.type === 'simulator' && (
+            <span className="block-hint">
+              {currentSimAsset ? `Usando: ${currentSimAsset.name}` : 'Selecciona un simulador'}
+            </span>
+          )}
+        </div>
+
+        <div className="block-actions">
+          <button className="icon-mini" onClick={onMoveUp} disabled={isFirst} title="Subir">
+            <ArrowUp size={16} />
+          </button>
+          <button className="icon-mini" onClick={onMoveDown} disabled={isLast} title="Bajar">
+            <ArrowDown size={16} />
+          </button>
+          <button className="icon-mini danger" onClick={onDelete} title="Eliminar">
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+
+      <div className="block-body">
+        {block.type === 'text' && (
+          <textarea
+            className="block-textarea"
+            value={block.content}
+            onChange={handleContentChange}
+            placeholder="Escribe aquí tu contenido… (LaTeX entre \\( \\) o $$ $$)"
+            rows={5}
+          />
+        )}
+
+        {block.type === 'simulator' && (
+          <div className="block-sim">
+            <div className="block-field">
+              <label className="block-label">Elige un simulador</label>
+              <select
+                className="block-select"
+                value={block.simulatorId || ''}
+                onChange={handleSimulatorChange}
+              >
+                <option value="">— Selecciona un simulador —</option>
+                {availableSimulators.map(sim => (
+                  <option key={sim.id} value={sim.id}>
+                    {sim.name} (v{sim.version})
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* --- CASO 1: EDITOR DE TEXTO --- */}
-            {block.type === 'text' && (
-                <textarea
-                    value={block.content}
-                    onChange={handleContentChange}
-                    placeholder="Escribe aquí tu contenido... (Soporta LaTeX entre \( \))"
-                    rows={4}
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}
-                />
+            {block.simulatorId && !currentSimAsset && (
+              <div className="block-warning">
+                ⚠️ Simulador no encontrado (¿fue borrado?)
+              </div>
             )}
 
-            {/* --- CASO 2: EDITOR DE SIMULADOR --- */}
-            {block.type === 'simulator' && (
-                <div>
-                    {/* Selector de Simulador */}
-                    <div className="row" style={{ marginBottom: '1rem' }}>
-                        <label style={{ fontWeight: 'bold', fontSize: '0.9rem', display: 'block', marginBottom: '5px' }}>
-                            Elige un Simulador:
-                        </label>
-                        <select 
-                            value={block.simulatorId || ''} 
-                            onChange={handleSimulatorChange}
-                            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}
-                        >
-                            <option value="">-- Selecciona un simulador --</option>
-                            {availableSimulators.map(sim => (
-                                <option key={sim.id} value={sim.id}>
-                                    {sim.name} (v{sim.version})
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Previsualización */}
-                    {currentSimAsset ? (
-                        <div style={{ border: '2px dashed var(--brand-secondary)', padding: '10px', borderRadius: '8px', background: '#f8fafc' }}>
-                            <p style={{fontSize: '0.8em', color: 'var(--text-muted)', textAlign: 'center', margin: '0 0 10px 0'}}>
-                                — Vista Previa en Vivo —
-                            </p>
-                            <SimulatorRenderer 
-                                code={currentSimAsset.code} 
-                                params={block.simConfig || {}} 
-                            />
-                        </div>
-                    ) : (
-                        block.simulatorId && <p className="text-muted">⚠️ Simulador no encontrado (¿fue borrado?)</p>
-                    )}
+            {currentSimAsset && (
+              <div className="block-preview">
+                <div className="block-preview-title">Vista previa en vivo</div>
+                <div className="block-preview-frame">
+                  <SimulatorRenderer code={currentSimAsset.code} params={block.simConfig || {}} />
                 </div>
+              </div>
             )}
-        </div>
-    );
+          </div>
+        )}
+      </div>
+    </section>
+  );
 };
