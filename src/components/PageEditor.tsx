@@ -108,7 +108,7 @@ export const PageEditor: React.FC<PageEditorProps> = ({ page, availableSimulator
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Actions
         <div className="page-top-actions">
           <button className="btn-action" onClick={() => addBlock('text')}>
             <FileText size={18} /> Añadir texto
@@ -118,8 +118,9 @@ export const PageEditor: React.FC<PageEditorProps> = ({ page, availableSimulator
             <Gamepad2 size={18} /> Añadir simulador
           </button>
         </div>
+        */}
       </div>
-
+      
       {/* Content */}
       <div className="page-content">
         {page.blocks.length === 0 ? (
