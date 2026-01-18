@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import '../editor_libro.css';
 import type { Page, ContentBlock, SimulatorAsset } from '../types';
 import { BlockEditor } from './BlockEditor';
 import { FileText, Gamepad2, LayoutPanelTop, Tag } from 'lucide-react';
